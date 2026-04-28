@@ -98,7 +98,7 @@ import type { getRouter } from './router.tsx'
 import type { createStart } from '@tanstack/react-start'
 declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true
+    ssr: false
     router: Awaited<ReturnType<typeof getRouter>>
   }
 }
