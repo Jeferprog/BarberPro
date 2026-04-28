@@ -124,11 +124,11 @@
   }
 
   html {
-    /* -webkit-fill-available: altura real do viewport no iOS Safari,
-       sem incluir a barra de endereços. Previne o freeze ao abrir teclado. */
+    /* -webkit-fill-available: altura real da tela no iOS Safari */
     height: 100%;
     height: -webkit-fill-available;
-    overflow: hidden;
+    /* SEM overflow: hidden — o browser precisa rolar o input
+       para cima do teclado ao focar. Bloquear isso causa freeze. */
   }
 
   body {
@@ -139,8 +139,7 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
-    /* Previne o scroll de bounce do iOS que contribui para o freeze */
-    overscroll-behavior: none;
+    overscroll-behavior-y: contain;
   }
 
   #root {
@@ -149,13 +148,13 @@
     min-height: -webkit-fill-available;
   }
 
-  /* Elimina o delay de 300ms em toque no iOS/Android para todos os elementos interativos */
+  /* Elimina o delay de 300ms em toque no iOS/Android */
   a, button, input, select, textarea, label, [role="button"] {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* IMPORTANTE: font-size >= 16px previne zoom automático ao focar inputs no iOS */
+  /* font-size >= 16px previne zoom automatico ao focar inputs no iOS */
   input, select, textarea {
     font-size: max(16px, 1em);
   }
