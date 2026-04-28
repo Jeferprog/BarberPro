@@ -1,9 +1,7 @@
-import { createRoot } from 'react-dom/client'
-import { RouterProvider } from '@tanstack/react-router'
+import { hydrateRoot } from 'react-dom/client'
+import { StartClient } from '@tanstack/react-start'
 import { getRouter } from './router'
 
 const router = getRouter()
 
-const rootElement = document.getElementById('root') || document.body
-
-createRoot(rootElement).render(<RouterProvider router={router} />)
+hydrateRoot(document, <StartClient router={router} />)
