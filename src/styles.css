@@ -120,15 +120,33 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    box-sizing: border-box;
   }
 
-  html, body {
+  html {
+    /* -webkit-fill-available: altura real do viewport no iOS Safari,
+       sem incluir a barra de endereços. Previne o freeze ao abrir teclado. */
+    height: 100%;
+    height: -webkit-fill-available;
+    overflow: hidden;
+  }
+
+  body {
+    min-height: 100%;
+    min-height: -webkit-fill-available;
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    /* Evita scroll horizontal acidental no mobile */
     overflow-x: hidden;
+    /* Previne o scroll de bounce do iOS que contribui para o freeze */
+    overscroll-behavior: none;
+  }
+
+  #root {
+    height: 100%;
+    min-height: 100%;
+    min-height: -webkit-fill-available;
   }
 
   /* Elimina o delay de 300ms em toque no iOS/Android para todos os elementos interativos */
@@ -137,8 +155,8 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Previne zoom acidental ao focar inputs no iOS (font-size >= 16px) */
+  /* IMPORTANTE: font-size >= 16px previne zoom automático ao focar inputs no iOS */
   input, select, textarea {
-    font-size: 16px;
+    font-size: max(16px, 1em);
   }
 }

@@ -151,8 +151,8 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   };
 
   return (
-    // Layout fixo com overflow-y-auto — não recalcula quando o teclado abre
-    <div className="flex flex-col min-h-screen px-6 py-8 overflow-y-auto">
+    // Sem min-h-screen/dvh — evita o iOS Safari freeze ao abrir teclado
+    <div className="flex flex-col px-6 py-8" style={{ minHeight: "100%" }}>
       <Link
         to="/"
         className="text-muted-foreground text-sm flex items-center gap-1"
