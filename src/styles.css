@@ -127,5 +127,18 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    /* Evita scroll horizontal acidental no mobile */
+    overflow-x: hidden;
+  }
+
+  /* Elimina o delay de 300ms em toque no iOS/Android para todos os elementos interativos */
+  a, button, input, select, textarea, label, [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Previne zoom acidental ao focar inputs no iOS (font-size >= 16px) */
+  input, select, textarea {
+    font-size: 16px;
   }
 }

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Phone, Calendar, Clock, ChevronRight, ArrowLeft, X, Scissors, Loader2 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,27 +64,39 @@ function ClientApp() {
 
 /* ---------------- LOGIN ---------------- */
 function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
-  const [phone, setPhone] = useState("");
-  const [name,  setName]  = useState("");
+  // Usar ref para o valor do telefone evita re-renders a cada tecla
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const [phoneDisplay, setPhoneDisplay] = useState("");
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [needName, setNeedName] = useState(false);
 
-  const formatPhone = (v: string) => {
+  const formatPhone = useCallback((v: string) => {
     const numbers = v.replace(/\D/g, "");
     if (numbers.length <= 2) return numbers;
     if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
     if (numbers.length <= 11) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
     return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
-  };
+  }, []);
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhone(e.target.value);
-    setPhone(formatted);
-  };
+  const handlePhoneInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const prevLen = input.value.length;
+    const formatted = formatPhone(input.value);
+    // Atualiza o display sem forçar re-render pesado
+    setPhoneDisplay(formatted);
+    // Preserva posição do cursor
+    requestAnimationFrame(() => {
+      if (input && formatted.length >= prevLen) {
+        const pos = formatted.length;
+        input.setSelectionRange(pos, pos);
+      }
+    });
+  }, [formatPhone]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const cleaned = phone.replace(/\D/g, "");
+    const cleaned = phoneDisplay.replace(/\D/g, "");
     
     if (cleaned.length < 10) { 
       toast.error("Telefone inválido. Informe o DDD e o número."); 
@@ -139,18 +151,23 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] px-6 py-8">
-      <Link to="/" className="text-muted-foreground text-sm flex items-center gap-1 hover:text-primary transition-colors">
+    // Layout fixo com overflow-y-auto — não recalcula quando o teclado abre
+    <div className="flex flex-col min-h-screen px-6 py-8 overflow-y-auto">
+      <Link
+        to="/"
+        className="text-muted-foreground text-sm flex items-center gap-1"
+        style={{ touchAction: "manipulation" }}
+      >
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
       
-      <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
+      <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full py-8">
         <div
           className="h-20 w-20 rounded-3xl flex items-center justify-center mb-8 mx-auto"
           style={{ 
             background: "var(--gradient-gold)", 
             boxShadow: "var(--shadow-gold)",
-            transform: "rotate(-5deg)" 
+            transform: "rotate(-5deg)"
           }}
         >
           <Scissors className="h-10 w-10 text-primary-foreground" />
@@ -163,35 +180,46 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1">
+            <label
+              htmlFor="phone-input"
+              className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1"
+            >
               Telefone
             </label>
             <input
+              id="phone-input"
+              ref={phoneRef}
               type="tel"
-              inputMode="tel"
+              inputMode="numeric"
               autoComplete="tel"
-              value={phone}
-              onChange={handlePhoneChange}
+              value={phoneDisplay}
+              onChange={handlePhoneInput}
               placeholder="(00) 00000-0000"
               disabled={loading}
-              className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary focus:ring-0 outline-none transition-all text-lg font-medium placeholder:text-muted-foreground/30"
+              style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+              className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary outline-none text-lg font-medium placeholder:text-muted-foreground/30"
             />
           </div>
 
           {needName && (
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
-              <label className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1">
+            <div className="space-y-2">
+              <label
+                htmlFor="name-input"
+                className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1"
+              >
                 Seu Nome
               </label>
               <input
+                id="name-input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Como devemos te chamar?"
                 disabled={loading}
                 autoFocus
-                className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary focus:ring-0 outline-none transition-all text-lg font-medium placeholder:text-muted-foreground/30"
+                style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+                className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary outline-none text-lg font-medium placeholder:text-muted-foreground/30"
               />
             </div>
           )}
