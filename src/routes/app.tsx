@@ -69,10 +69,22 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   const [loading, setLoading] = useState(false);
   const [needName, setNeedName] = useState(false);
 
-  const handleSubmit = async () => {
+  const formatPhone = (v: string) => {
+    v = v.replace(/\D/g, "");
+    if (v.length > 11) v = v.slice(0, 11);
+    if (v.length > 10) return v.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+    if (v.length > 6) return v.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+    if (v.length > 2) return v.replace(/(\d{2})(\d{0,5})/, "($1) $2");
+    return v;
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const cleaned = phone.replace(/\D/g, "");
     if (cleaned.length < 10) { toast.error("Telefone inválido"); return; }
     if (needName && !name.trim()) { toast.error("Informe seu nome"); return; }
+    if (loading) return;
+    
     setLoading(true);
     try {
       const shopId = await getBarbershopId();
@@ -120,7 +132,7 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
         <h1 className="text-3xl font-bold">Bem-vindo</h1>
         <p className="text-muted-foreground mt-2">Entre com seu telefone para continuar</p>
 
-        <div className="mt-10 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-10 space-y-4">
           <div className="mt-6">
             <label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Telefone</label>
             <input
@@ -128,16 +140,16 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
               inputMode="tel"
               autoComplete="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
               placeholder="(11) 99999-9999"
-              className="mt-2 w-full bg-white text-black h-14 px-4 rounded-xl border-2 border-primary/20 focus:border-primary outline-none transition-all"
+              className="mt-2 w-full bg-white text-black h-14 px-4 rounded-xl border-2 border-primary/20 focus:border-primary outline-none"
             />
           </div>
 
           {needName && (
-            <div>
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
               <label className="text-xs text-muted-foreground uppercase tracking-wider">Seu nome</label>
-              <div className="mt-2 flex items-center gap-3 bg-card rounded-2xl px-4 py-4">
+              <div className="mt-2 flex items-center gap-3 bg-card rounded-2xl px-4 py-4 border border-border">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -149,15 +161,15 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
           )}
 
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-2xl font-semibold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-4 rounded-2xl font-semibold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98] transition-transform"
             style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {needName ? "Criar conta" : "Continuar"}
           </button>
-        </div>
+        </form>
       </div>
     </div>
   );
