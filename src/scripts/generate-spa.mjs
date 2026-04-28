@@ -26,6 +26,7 @@ const html = `<!DOCTYPE html>
   </script>
 </head>
 <body>
+  <div id="root"></div>
   <script type="module" src="/assets/${mainBundle}"></script>
 </body>
 </html>`;
