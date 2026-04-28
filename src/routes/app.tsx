@@ -126,10 +126,13 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
             <div className="mt-2 flex items-center gap-3 bg-card rounded-2xl px-4 py-4">
               <Phone className="h-5 w-5 text-primary" />
               <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(11) 99999-9999"
-                className="bg-transparent outline-none flex-1 text-foreground placeholder:text-muted-foreground"
+                className="bg-transparent outline-none flex-1 text-foreground placeholder:text-muted-foreground w-full"
               />
             </div>
           </div>
