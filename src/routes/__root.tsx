@@ -69,13 +69,13 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  useEffect(() => {
+  /* useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       import("virtual:pwa-register").then(({ registerSW }) => {
         registerSW({ immediate: true });
       }).catch(() => {});
     }
-  }, []);
+  }, []); */
 
   return (
     <>

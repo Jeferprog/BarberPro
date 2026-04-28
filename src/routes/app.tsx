@@ -121,20 +121,17 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
         <p className="text-muted-foreground mt-2">Entre com seu telefone para continuar</p>
 
         <div className="mt-10 space-y-4">
-          <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wider">Telefone</label>
-            <div className="mt-2 flex items-center gap-3 bg-card rounded-2xl px-4 py-4">
-              <Phone className="h-5 w-5 text-primary" />
-              <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="(11) 99999-9999"
-                className="bg-transparent outline-none flex-1 text-foreground placeholder:text-muted-foreground w-full"
-              />
-            </div>
+          <div className="mt-6">
+            <label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Telefone</label>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(11) 99999-9999"
+              className="mt-2 w-full bg-white text-black h-14 px-4 rounded-xl border-2 border-primary/20 focus:border-primary outline-none transition-all"
+            />
           </div>
 
           {needName && (
