@@ -70,106 +70,155 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   const [needName, setNeedName] = useState(false);
 
   const formatPhone = (v: string) => {
-    v = v.replace(/\D/g, "");
-    if (v.length > 11) v = v.slice(0, 11);
-    if (v.length > 10) return v.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-    if (v.length > 6) return v.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
-    if (v.length > 2) return v.replace(/(\d{2})(\d{0,5})/, "($1) $2");
-    return v;
+    const numbers = v.replace(/\D/g, "");
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 11) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    setPhone(formatted);
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length < 10) { toast.error("Telefone inválido"); return; }
-    if (needName && !name.trim()) { toast.error("Informe seu nome"); return; }
+    
+    if (cleaned.length < 10) { 
+      toast.error("Telefone inválido. Informe o DDD e o número."); 
+      return; 
+    }
+    if (needName && !name.trim()) { 
+      toast.error("Por favor, informe seu nome para continuar."); 
+      return; 
+    }
     if (loading) return;
     
     setLoading(true);
     try {
       const shopId = await getBarbershopId();
-      // Busca cliente existente
-      const { data: existing } = await supabase
+      
+      const { data: existing, error: searchError } = await supabase
         .from("clients")
         .select("id, name")
         .eq("phone", cleaned)
         .maybeSingle();
+
+      if (searchError) throw searchError;
 
       if (existing) {
         toast.success(`Bem-vindo de volta, ${existing.name}!`);
         onLogin(existing.id, existing.name);
         return;
       }
-      // Novo cliente — precisa de nome
-      if (!needName) { setNeedName(true); setLoading(false); return; }
-      const { data: created, error } = await supabase
+
+      if (!needName) { 
+        setNeedName(true); 
+        setLoading(false); 
+        return; 
+      }
+
+      const { data: created, error: insertError } = await supabase
         .from("clients")
         .insert({ phone: cleaned, name: name.trim() })
         .select("id, name")
         .single();
-      if (error) throw error;
+
+      if (insertError) throw insertError;
+      
       toast.success(`Bem-vindo, ${created.name}!`);
       onLogin(created.id, created.name);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Erro ao entrar");
+    } catch (e: any) {
+      console.error("Login error:", e);
+      toast.error(e.message || "Erro ao tentar entrar");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col min-h-screen px-6 py-12">
-      <Link to="/" className="text-muted-foreground text-sm flex items-center gap-1">
+    <div className="flex flex-col min-h-[100dvh] px-6 py-8">
+      <Link to="/" className="text-muted-foreground text-sm flex items-center gap-1 hover:text-primary transition-colors">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
-      <div className="flex-1 flex flex-col justify-center">
+      
+      <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
         <div
-          className="h-16 w-16 rounded-2xl flex items-center justify-center mb-6"
-          style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}
+          className="h-20 w-20 rounded-3xl flex items-center justify-center mb-8 mx-auto"
+          style={{ 
+            background: "var(--gradient-gold)", 
+            boxShadow: "var(--shadow-gold)",
+            transform: "rotate(-5deg)" 
+          }}
         >
-          <Scissors className="h-8 w-8 text-primary-foreground" />
+          <Scissors className="h-10 w-10 text-primary-foreground" />
         </div>
-        <h1 className="text-3xl font-bold">Bem-vindo</h1>
-        <p className="text-muted-foreground mt-2">Entre com seu telefone para continuar</p>
 
-        <form onSubmit={handleSubmit} className="mt-10 space-y-4">
-          <div className="mt-6">
-            <label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Telefone</label>
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold tracking-tight">BarberPro</h1>
+          <p className="text-muted-foreground mt-3 text-lg">
+            {needName ? "Só mais um passo..." : "Agende seu estilo em segundos"}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1">
+              Telefone
+            </label>
             <input
               type="tel"
               inputMode="tel"
               autoComplete="tel"
               value={phone}
-              onChange={(e) => setPhone(formatPhone(e.target.value))}
-              placeholder="(11) 99999-9999"
-              className="mt-2 w-full bg-white text-black h-14 px-4 rounded-xl border-2 border-primary/20 focus:border-primary outline-none"
+              onChange={handlePhoneChange}
+              placeholder="(00) 00000-0000"
+              disabled={loading}
+              className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary focus:ring-0 outline-none transition-all text-lg font-medium placeholder:text-muted-foreground/30"
             />
           </div>
 
           {needName && (
-            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-              <label className="text-xs text-muted-foreground uppercase tracking-wider">Seu nome</label>
-              <div className="mt-2 flex items-center gap-3 bg-card rounded-2xl px-4 py-4 border border-border">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Como você se chama?"
-                  className="bg-transparent outline-none flex-1 text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
+              <label className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1">
+                Seu Nome
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Como devemos te chamar?"
+                disabled={loading}
+                autoFocus
+                className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary focus:ring-0 outline-none transition-all text-lg font-medium placeholder:text-muted-foreground/30"
+              />
             </div>
           )}
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-4 rounded-2xl font-semibold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98] transition-transform"
-            style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}
+            disabled={loading || (phone.length < 14)}
+            className="w-full py-5 rounded-2xl font-bold text-lg text-primary-foreground flex items-center justify-center gap-3 disabled:opacity-40 active:scale-[0.97] transition-all mt-4"
+            style={{ 
+              background: "var(--gradient-gold)", 
+              boxShadow: "var(--shadow-gold)" 
+            }}
           >
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {needName ? "Criar conta" : "Continuar"}
+            {loading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <>
+                {needName ? "Concluir Cadastro" : "Entrar Agora"}
+                <ChevronRight className="h-5 w-5" />
+              </>
+            )}
           </button>
         </form>
+
+        <p className="text-center text-xs text-muted-foreground mt-10 px-4">
+          Ao continuar, você concorda em receber mensagens para confirmação de agendamentos.
+        </p>
       </div>
     </div>
   );
@@ -487,7 +536,7 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
       <button
         disabled={!canContinue || saving}
         onClick={step === 3 ? confirm : next}
-        className="fixed bottom-6 left-6 right-6 max-w-[382px] mx-auto py-4 rounded-2xl font-semibold text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center gap-2"
+        className="fixed bottom-6 left-6 right-6 max-w-[382px] mx-auto py-4 rounded-2xl font-semibold text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center gap-3"
         style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}
       >
         {saving && <Loader2 className="h-4 w-4 animate-spin" />}
