@@ -3,7 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/pwa-192x192.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      interactive-widget=resizes-visual: quando o teclado virtual abre,
+      apenas a visual viewport é redimensionada, não o layout.
+      Isso previne o freeze/reflow em todos os inputs no mobile.
+      viewport-fit=cover: suporte a notch (iPhone X+)
+      maximum-scale=1: previne zoom automático ao focar inputs no iOS
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>BarberPro — Agendamento Premium</title>
   </head>
   <body>
