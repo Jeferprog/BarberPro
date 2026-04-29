@@ -65,7 +65,7 @@ function Landing() {
           </Link>
         </div>
 
-        <p className="mt-12 text-xs text-muted-foreground">v1.0 • Demo com dados mockados</p>
+        <p className="mt-12 text-xs text-muted-foreground">v1.0 • Desenvolvido por JDD</p>
       </div>
     </MobileShell>
   );
