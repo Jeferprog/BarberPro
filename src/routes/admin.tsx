@@ -34,16 +34,58 @@ type AppointmentRow = {
   services: { name: string; price_cents: number } | null;
 };
 
+const ADMIN_PASSWORD = "suasenhaaqui123"; // troca por uma senha forte
+
 function AdminApp() {
+  const [authorized, setAuthorized] = useState(() => {
+    return sessionStorage.getItem("admin_auth") === ADMIN_PASSWORD;
+  });
+  const [pwInput, setPwInput] = useState("");
   const [tab, setTab] = useState<Tab>("agenda");
   const [shopId, setShopId] = useState<string | null>(null);
 
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Painel da Barbearia</h1>
+            <p className="text-muted-foreground text-sm mt-2">Acesso restrito</p>
+          </div>
+          <input
+            type="password"
+            value={pwInput}
+            onChange={(e) => setPwInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && pwInput === ADMIN_PASSWORD) {
+                sessionStorage.setItem("admin_auth", ADMIN_PASSWORD);
+                setAuthorized(true);
+              }
+            }}
+            placeholder="Senha de acesso"
+            className="w-full bg-card text-foreground h-14 px-5 rounded-2xl border-2 border-border focus:border-primary outline-none text-base"
+          />
+          <button
+            onClick={() => {
+              if (pwInput === ADMIN_PASSWORD) {
+                sessionStorage.setItem("admin_auth", ADMIN_PASSWORD);
+                setAuthorized(true);
+              } else {
+                setPwInput("");
+              }
+            }}
+            className="w-full py-4 rounded-2xl font-bold text-primary-foreground"
+            style={{ background: "var(--gradient-gold)" }}
+          >
+            Entrar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     getBarbershopId()
-      .then(setShopId)
-      .catch((e) => toast.error(e.message ?? "Erro ao carregar barbearia"));
-  }, []);
-
   return (
     <MobileShell withBottomNav>
       <div className="px-6 pt-10">
