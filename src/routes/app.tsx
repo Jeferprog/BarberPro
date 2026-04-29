@@ -28,16 +28,46 @@ type Appointment = {
   barbers:  { name: string } | null;
 };
 
+const CLIENT_SESSION_MS = 2 * 60 * 60 * 1000; // 2 horas
+
+function getClientSession(): { id: string; name: string } | null {
+  try {
+    const expiry = localStorage.getItem("client_auth_expiry");
+    const id = localStorage.getItem("client_id");
+    const name = localStorage.getItem("client_name");
+    if (!expiry || !id || !name) return null;
+    if (Date.now() > Number(expiry)) return null;
+    return { id, name };
+  } catch { return null; }
+}
+
+function saveClientSession(id: string, name: string) {
+  localStorage.setItem("client_id", id);
+  localStorage.setItem("client_name", name);
+  localStorage.setItem("client_auth_expiry", String(Date.now() + CLIENT_SESSION_MS));
+}
+
 function ClientApp() {
-  const [screen, setScreen]     = useState<Screen>("login");
-  const [clientId, setClientId] = useState<string | null>(null);
-  const [clientName, setClientName] = useState("");
+  const [screen, setScreen] = useState<Screen>(() => {
+    return getClientSession() ? "home" : "login";
+  });
+  const [clientId, setClientId] = useState<string | null>(() => {
+    return getClientSession()?.id ?? null;
+  });
+  const [clientName, setClientName] = useState(() => {
+    return getClientSession()?.name ?? "";
+  });
 
   return (
     <MobileShell>
       {screen === "login" && (
         <Login
-          onLogin={(id, name) => { setClientId(id); setClientName(name); setScreen("home"); }}
+          onLogin={(id, name) => {
+            saveClientSession(id, name);
+            setClientId(id);
+            setClientName(name);
+            setScreen("home");
+          }}
         />
       )}
       {screen === "home" && (
@@ -61,7 +91,6 @@ function ClientApp() {
     </MobileShell>
   );
 }
-
 /* ---------------- LOGIN ---------------- */
 function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   // Usar ref para o valor do telefone evita re-renders a cada tecla
