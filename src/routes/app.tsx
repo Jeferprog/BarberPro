@@ -102,36 +102,43 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
       toast.error("Telefone inválido. Informe o DDD e o número."); 
       return; 
     }
-    if (needName && !name.trim()) { 
+    if (loading) return;
+
+    // Passo 1: busca pelo telefone
+    if (!needName) {
+      setNeedName(true);
+      return;
+    }
+
+    // Passo 2: valida nome
+    if (!name.trim()) { 
       toast.error("Por favor, informe seu nome para continuar."); 
       return; 
     }
-    if (loading) return;
     
     setLoading(true);
     try {
-      const shopId = await getBarbershopId();
-      
-      const { data: existing, error: searchError } = await supabase
+      const { data: existing } = await supabase
         .from("clients")
         .select("id, name")
         .eq("phone", cleaned)
         .maybeSingle();
 
-      if (searchError) throw searchError;
-
       if (existing) {
+        // Verifica se o nome confere (case insensitive, ignora espaços extras)
+        const nomeInformado = name.trim().toLowerCase();
+        const nomeCadastrado = existing.name.toLowerCase();
+        if (!nomeCadastrado.includes(nomeInformado) && !nomeInformado.includes(nomeCadastrado)) {
+          toast.error("Nome não confere com o cadastro.");
+          setLoading(false);
+          return;
+        }
         toast.success(`Bem-vindo de volta, ${existing.name}!`);
         onLogin(existing.id, existing.name);
         return;
       }
 
-      if (!needName) { 
-        setNeedName(true); 
-        setLoading(false); 
-        return; 
-      }
-
+      // Novo cliente — cria cadastro
       const { data: created, error: insertError } = await supabase
         .from("clients")
         .insert({ phone: cleaned, name: name.trim() })
@@ -139,7 +146,6 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
         .single();
 
       if (insertError) throw insertError;
-      
       toast.success(`Bem-vindo, ${created.name}!`);
       onLogin(created.id, created.name);
     } catch (e: any) {
@@ -149,7 +155,6 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
       setLoading(false);
     }
   };
-
   return (
     // Sem min-h-screen/dvh — evita o iOS Safari freeze ao abrir teclado
     <div className="flex flex-col px-6 py-8" style={{ minHeight: "100%" }}>
@@ -209,13 +214,13 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
                 htmlFor="name-input"
                 className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1"
               >
-                Seu Nome
+                Seu Nome (Como cadastrado)
               </label>
               <input
                 id="name-input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Como devemos te chamar?"
+                placeholder="Seu nome completo"
                 disabled={loading}
                 autoFocus
                 style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
