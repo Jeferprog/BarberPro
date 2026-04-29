@@ -34,7 +34,7 @@ type AppointmentRow = {
   services: { name: string; price_cents: number } | null;
 };
 
-const ADMIN_PASSWORD = "suasenhaaqui123"; // troca por uma senha forte
+const ADMIN_PASSWORD = "suasenha"; // troca por uma senha forte
 
 function AdminApp() {
   const [authorized, setAuthorized] = useState(() => {
