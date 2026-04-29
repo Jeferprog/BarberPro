@@ -226,7 +226,7 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
 
           <button
             type="submit"
-            disabled={loading || (phone.length < 14)}
+            disabled={loading || (phoneDisplay.replace(/\D/g, "").length < 10)}
             className="w-full py-5 rounded-2xl font-bold text-lg text-primary-foreground flex items-center justify-center gap-3 disabled:opacity-40 active:scale-[0.97] transition-all mt-4"
             style={{ 
               background: "var(--gradient-gold)", 
