@@ -44,6 +44,12 @@ function AdminApp() {
   const [tab, setTab] = useState<Tab>("agenda");
   const [shopId, setShopId] = useState<string | null>(null);
 
+  useEffect(() => {
+    getBarbershopId()
+      .then(setShopId)
+      .catch((e) => toast.error(e.message ?? "Erro ao carregar barbearia"));
+  }, []);
+
   if (!authorized) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-6">
@@ -84,8 +90,6 @@ function AdminApp() {
     );
   }
 
-  useEffect(() => {
-    getBarbershopId()
   return (
     <MobileShell withBottomNav>
       <div className="px-6 pt-10">
@@ -97,7 +101,7 @@ function AdminApp() {
               {tab === "barbeiros" && "Barbeiros"}
               {tab === "servicos" && "Serviços"}
               {tab === "horarios" && "Horários"}
-            {tab === "relatorio" && "Relatório"}
+              {tab === "relatorio" && "Relatório"}
             </h1>
           </div>
           <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">
