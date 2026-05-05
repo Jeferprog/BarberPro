@@ -24,10 +24,10 @@ type Appointment = {
   id: string;
   starts_at: string;
   status: string;
+  photo_url?: string | null;
   services: { name: string; price_cents: number } | null;
   barbers:  { name: string } | null;
 };
-
 const CLIENT_SESSION_MS = 2 * 60 * 60 * 1000; // 2 horas
 
 function getClientSession(): { id: string; name: string } | null {
@@ -350,7 +350,7 @@ function Home({ name, clientId, onBook, onAppointments }: {
 }
 
 /* ---------------- APPOINTMENT CARD ---------------- */
-function AppointmentCard({ appt, onCancel }: { appt: Appointment; onCancel?: () => void }) {
+function AppointmentCard({ appt, onCancel, showPhoto }: { appt: Appointment; onCancel?: () => void; showPhoto?: boolean }) {
   const dt = new Date(appt.starts_at);
   const dateStr = dt.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
   const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -380,9 +380,18 @@ function AppointmentCard({ appt, onCancel }: { appt: Appointment; onCancel?: () 
           <X className="h-4 w-4" /> Cancelar agendamento
         </button>
       )}
-      {appt.status === "cancelled" && (
+  {appt.status === "cancelled" && (
         <div className="mt-3">
           <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Cancelado</span>
+        </div>
+      )}
+      {showPhoto && appt.photo_url && (
+        <div className="mt-4">
+          <img
+            src={appt.photo_url}
+            alt="Foto do corte"
+            className="w-full rounded-2xl object-cover max-h-64"
+          />
         </div>
       )}
     </div>
@@ -610,16 +619,94 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
 
 /* ---------------- MY APPOINTMENTS ---------------- */
 function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => void }) {
-  const [items, setItems] = useState<Appointment[] | null>(null);
+  const [upcoming, setUpcoming] = useState<Appointment[]>([]);
+  const [history, setHistory] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const load = async () => {
-    const { data } = await supabase
-      .from("appointments")
-      .select("id, starts_at, status, services(name, price_cents), barbers(name)")
-      .eq("client_id", clientId)
-      .order("starts_at", { ascending: false });
-    if (data) setItems(data as unknown as Appointment[]);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("appointments")
+        .select("id, starts_at, status, photo_url, services(name, price_cents), barbers(name)")
+        .eq("client_id", clientId)
+        .order("starts_at", { ascending: false });
+
+      if (data) {
+        const all = data as unknown as Appointment[];
+        setUpcoming(all.filter((a) => a.status === "scheduled" || a.status === "arrived"));
+        setHistory(all.filter((a) => a.status === "completed"));
+      }
+      setLoading(false);
+    })();
+  }, [clientId]);
+
+  const cancel = async (id: string) => {
+    const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", id);
+    if (error) { toast.error("Erro ao cancelar"); return; }
+    toast.success("Agendamento cancelado");
+    setUpcoming((arr) => arr.filter((a) => a.id !== id));
   };
+
+  return (
+    <div className="px-6 py-8 pb-16">
+      <div className="flex items-center gap-3 mb-8">
+        <button onClick={onBack} className="h-10 w-10 rounded-full bg-card flex items-center justify-center">
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <h1 className="text-xl font-bold">Meus Agendamentos</h1>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          <div className="mb-6">
+            <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-3">
+              Próximos
+            </h2>
+            {upcoming.length === 0 ? (
+              <div className="bg-card rounded-2xl p-5 text-center text-muted-foreground text-sm">
+                Nenhum agendamento futuro
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcoming.map((a) => (
+                  <AppointmentCard
+                    key={a.id}
+                    appt={a}
+                    onCancel={() => cancel(a.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-3">
+              Histórico
+            </h2>
+            {history.length === 0 ? (
+              <div className="bg-card rounded-2xl p-5 text-center text-muted-foreground text-sm">
+                Nenhum atendimento finalizado ainda
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {history.map((a) => (
+                  <AppointmentCard key={a.id} appt={a} showPhoto />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
   useEffect(() => { load(); }, [clientId]);
 
