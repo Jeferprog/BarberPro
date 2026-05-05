@@ -172,7 +172,13 @@ function AgendaTab({ shopId }: { shopId: string }) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [shopId, selectedDate]);
 
+  const [photoModal, setPhotoModal] = useState<string | null>(null);
+
   const updateStatus = async (id: string, status: AppointmentStatus) => {
+    if (status === "completed") {
+      setPhotoModal(id);
+      return;
+    }
     const prev = items;
     setItems((arr) => arr?.map((a) => a.id === id ? { ...a, status } : a) ?? null);
     const { error } = await supabase.from("appointments").update({ status }).eq("id", id);
@@ -184,6 +190,32 @@ function AgendaTab({ shopId }: { shopId: string }) {
     }
   };
 
+  const finalizeWithPhoto = async (id: string, file: File | null) => {
+    try {
+      let photo_url: string | null = null;
+      if (file) {
+        const ext = file.name.split(".").pop() ?? "jpg";
+        const path = `${shopId}/${id}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("appointment-photos")
+          .upload(path, file, { upsert: true });
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from("appointment-photos").getPublicUrl(path);
+        photo_url = data.publicUrl;
+      }
+      const { error } = await supabase
+        .from("appointments")
+        .update({ status: "completed", photo_url })
+        .eq("id", id);
+      if (error) throw error;
+      setItems((arr) => arr?.map((a) => a.id === id ? { ...a, status: "completed" as AppointmentStatus, photo_url } : a) ?? null);
+      toast.success("Atendimento finalizado!");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao finalizar");
+    } finally {
+      setPhotoModal(null);
+    }
+  };
   if (!items) return <Loading />;
 
   return (
@@ -262,6 +294,63 @@ function AgendaTab({ shopId }: { shopId: string }) {
           </div>
         );
       })}
+</div>
+
+    {photoModal && (
+      <PhotoModal
+        onClose={() => setPhotoModal(null)}
+        onConfirm={(file) => finalizeWithPhoto(photoModal, file)}
+      />
+    )}
+  );
+}
+
+function PhotoModal({ onClose, onConfirm }: {
+  onClose: () => void;
+  onConfirm: (file: File | null) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md bg-card rounded-3xl p-6 space-y-4"
+        style={{ boxShadow: "var(--shadow-card)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold">Finalizar Atendimento</h2>
+        <p className="text-sm text-muted-foreground">Adicione uma foto do resultado (opcional)</p>
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="w-full text-xs text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:font-medium"
+        />
+        {file && (
+          <img
+            src={URL.createObjectURL(file)}
+            alt="preview"
+            className="w-full h-48 object-cover rounded-2xl"
+          />
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={onClose}
+            className="py-3 rounded-xl bg-card-elevated text-muted-foreground font-medium"
+          >
+            Cancelar
+          </button>
+          <button
+            disabled={saving}
+            onClick={async () => { setSaving(true); await onConfirm(file); }}
+            className="py-3 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Finalizar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
