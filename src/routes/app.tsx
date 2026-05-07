@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Phone, Calendar, Clock, ChevronRight, ArrowLeft, X, Scissors, Loader2 } from "lucide-react";
+import { Phone, Calendar, Clock, ChevronRight, ArrowLeft, X, Scissors, Loader2, AlertTriangle } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { supabase } from "@/integrations/supabase/client";
 import { getBarbershopId, formatBRL } from "@/lib/barbershop";
@@ -25,6 +25,7 @@ type Appointment = {
   starts_at: string;
   status: string;
   photo_url?: string | null;
+  has_penalty?: boolean;
   services: { name: string; price_cents: number } | null;
   barbers:  { name: string } | null;
 };
@@ -126,9 +127,7 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
       onLogin(created.id, created.name);
     } catch (e: any) {
       toast.error(e.message || "Erro ao tentar entrar");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
@@ -147,29 +146,15 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div className="space-y-2">
             <label htmlFor="phone-input" className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1">Telefone</label>
-            <input
-              id="phone-input" ref={phoneRef} type="tel" inputMode="numeric" autoComplete="tel"
-              value={phoneDisplay} onChange={handlePhoneInput} placeholder="(00) 00000-0000" disabled={loading}
-              style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
-              className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary outline-none text-lg font-medium placeholder:text-muted-foreground/30"
-            />
+            <input id="phone-input" ref={phoneRef} type="tel" inputMode="numeric" autoComplete="tel" value={phoneDisplay} onChange={handlePhoneInput} placeholder="(00) 00000-0000" disabled={loading} style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }} className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary outline-none text-lg font-medium placeholder:text-muted-foreground/30" />
           </div>
           {needName && (
             <div className="space-y-2">
               <label htmlFor="name-input" className="text-xs text-muted-foreground uppercase tracking-widest font-bold ml-1">Seu Nome (como cadastrado)</label>
-              <input
-                id="name-input" value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="Seu nome completo" disabled={loading} autoFocus
-                style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
-                className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary outline-none text-lg font-medium placeholder:text-muted-foreground/30"
-              />
+              <input id="name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" disabled={loading} autoFocus style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }} className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary outline-none text-lg font-medium placeholder:text-muted-foreground/30" />
             </div>
           )}
-          <button
-            type="submit" disabled={loading || (phoneDisplay.replace(/\D/g, "").length < 10)}
-            className="w-full py-5 rounded-2xl font-bold text-lg text-primary-foreground flex items-center justify-center gap-3 disabled:opacity-40 active:scale-[0.97] transition-all mt-4"
-            style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}
-          >
+          <button type="submit" disabled={loading || (phoneDisplay.replace(/\D/g, "").length < 10)} className="w-full py-5 rounded-2xl font-bold text-lg text-primary-foreground flex items-center justify-center gap-3 disabled:opacity-40 active:scale-[0.97] transition-all mt-4" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
             {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <>{needName ? "Concluir Cadastro" : "Entrar Agora"}<ChevronRight className="h-5 w-5" /></>}
           </button>
         </form>
@@ -236,6 +221,12 @@ function AppointmentCard({ appt, onCancel, showPhoto }: { appt: Appointment; onC
           <div className="text-xs text-muted-foreground mt-1">{appt.services ? formatBRL(appt.services.price_cents) : "—"}</div>
         </div>
       </div>
+      {appt.has_penalty && appt.status === "scheduled" && (
+        <div className="mt-3 flex items-center gap-2 bg-warning/10 rounded-xl px-3 py-2">
+          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+          <p className="text-xs text-warning">Penalidade de cancelamento sera cobrada no proximo atendimento</p>
+        </div>
+      )}
       {onCancel && appt.status === "scheduled" && (
         <button onClick={onCancel} className="mt-4 w-full py-2.5 rounded-xl bg-destructive/10 text-destructive text-sm font-medium flex items-center justify-center gap-1">
           <X className="h-4 w-4" /> Cancelar agendamento
@@ -309,9 +300,7 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
       onDone();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao agendar");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const next = () => setStep((s) => s + 1);
@@ -320,45 +309,32 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
   return (
     <div className="px-6 py-8 pb-24">
       <div className="flex items-center gap-3">
-        <button onClick={step === 1 ? onBack : () => setStep((s) => s - 1)} className="h-10 w-10 rounded-full bg-card flex items-center justify-center">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
+        <button onClick={step === 1 ? onBack : () => setStep((s) => s - 1)} className="h-10 w-10 rounded-full bg-card flex items-center justify-center"><ArrowLeft className="h-5 w-5" /></button>
         <div>
           <div className="text-xs text-muted-foreground">Passo {step} de 3</div>
           <div className="font-semibold">{step === 1 ? "Escolha o servico" : step === 2 ? "Escolha o barbeiro" : "Escolha o horario"}</div>
         </div>
       </div>
-
       <div className="mt-5 flex gap-2">
         {[1, 2, 3].map((n) => <div key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-primary" : "bg-card"}`} />)}
       </div>
-
       <div className="mt-8 space-y-3">
         {step === 1 && services.map((s) => (
           <button key={s.id} onClick={() => setService(s)} className={`w-full p-5 rounded-2xl bg-card text-left flex items-center justify-between transition-all ${service?.id === s.id ? "ring-2 ring-primary" : ""}`} style={{ boxShadow: "var(--shadow-card)" }}>
-            <div>
-              <div className="font-semibold">{s.name}</div>
-              <div className="text-xs text-muted-foreground mt-1">{s.duration_minutes} min</div>
-            </div>
+            <div><div className="font-semibold">{s.name}</div><div className="text-xs text-muted-foreground mt-1">{s.duration_minutes} min</div></div>
             <div className="text-primary font-semibold">{formatBRL(s.price_cents)}</div>
           </button>
         ))}
-
         {step === 2 && (
           <div className="grid grid-cols-2 gap-3">
             {barbers.map((b) => (
               <button key={b.id} onClick={() => setBarber(b)} className={`p-4 rounded-2xl bg-card text-center transition-all ${barber?.id === b.id ? "ring-2 ring-primary" : ""}`} style={{ boxShadow: "var(--shadow-card)" }}>
-                {b.photo_url ? (
-                  <img src={b.photo_url} alt={b.name} className="h-20 w-20 rounded-full mx-auto object-cover" />
-                ) : (
-                  <div className="h-20 w-20 rounded-full mx-auto bg-card-elevated flex items-center justify-center text-2xl font-bold text-primary">{b.name[0]}</div>
-                )}
+                {b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-20 w-20 rounded-full mx-auto object-cover" /> : <div className="h-20 w-20 rounded-full mx-auto bg-card-elevated flex items-center justify-center text-2xl font-bold text-primary">{b.name[0]}</div>}
                 <div className="font-medium mt-3 text-sm">{b.name}</div>
               </button>
             ))}
           </div>
         )}
-
         {step === 3 && (
           <>
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6">
@@ -384,13 +360,7 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
           </>
         )}
       </div>
-
-      <button
-        disabled={!canContinue || saving}
-        onClick={step === 3 ? confirm : next}
-        className="fixed bottom-6 left-6 right-6 max-w-[382px] mx-auto py-4 rounded-2xl font-semibold text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center gap-3"
-        style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}
-      >
+      <button disabled={!canContinue || saving} onClick={step === 3 ? confirm : next} className="fixed bottom-6 left-6 right-6 max-w-[382px] mx-auto py-4 rounded-2xl font-semibold text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center gap-3" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
         {saving && <Loader2 className="h-4 w-4 animate-spin" />}
         {step === 3 ? "Confirmar Agendamento" : "Continuar"}
       </button>
@@ -398,15 +368,17 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
   );
 }
 
+/* ---------------- MY APPOINTMENTS ---------------- */
 function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => void }) {
   const [upcoming, setUpcoming] = useState<Appointment[]>([]);
   const [history, setHistory] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelModal, setCancelModal] = useState<{ id: string; starts_at: string } | null>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await supabase.from("appointments").select("id, starts_at, status, photo_url, services(name, price_cents), barbers(name)").eq("client_id", clientId).order("starts_at", { ascending: false });
+      const { data } = await supabase.from("appointments").select("id, starts_at, status, photo_url, has_penalty, services(name, price_cents), barbers(name)").eq("client_id", clientId).order("starts_at", { ascending: false });
       if (data) {
         const all = data as unknown as Appointment[];
         setUpcoming(all.filter((a) => a.status === "scheduled" || a.status === "arrived"));
@@ -416,19 +388,22 @@ function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => 
     })();
   }, [clientId]);
 
-  const cancel = async (id: string) => {
-    const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", id);
+  const requestCancel = (appt: Appointment) => {
+    setCancelModal({ id: appt.id, starts_at: appt.starts_at });
+  };
+
+  const doCancel = async (id: string, hasPenalty: boolean) => {
+    const { error } = await supabase.from("appointments").update({ status: "cancelled", has_penalty: hasPenalty }).eq("id", id);
     if (error) { toast.error("Erro ao cancelar"); return; }
-    toast.success("Agendamento cancelado");
+    toast.success(hasPenalty ? "Agendamento cancelado. Penalidade sera cobrada no proximo atendimento." : "Agendamento cancelado.");
     setUpcoming((arr) => arr.filter((a) => a.id !== id));
+    setCancelModal(null);
   };
 
   return (
     <div className="px-6 py-8 pb-16">
       <div className="flex items-center gap-3 mb-8">
-        <button onClick={onBack} className="h-10 w-10 rounded-full bg-card flex items-center justify-center">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
+        <button onClick={onBack} className="h-10 w-10 rounded-full bg-card flex items-center justify-center"><ArrowLeft className="h-5 w-5" /></button>
         <h1 className="text-xl font-bold">Meus Agendamentos</h1>
       </div>
 
@@ -441,7 +416,9 @@ function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => 
             {upcoming.length === 0 ? (
               <div className="bg-card rounded-2xl p-5 text-center text-muted-foreground text-sm">Nenhum agendamento futuro</div>
             ) : (
-              <div className="space-y-3">{upcoming.map((a) => <AppointmentCard key={a.id} appt={a} onCancel={() => cancel(a.id)} />)}</div>
+              <div className="space-y-3">
+                {upcoming.map((a) => <AppointmentCard key={a.id} appt={a} onCancel={() => requestCancel(a)} />)}
+              </div>
             )}
           </div>
           <div>
@@ -454,6 +431,82 @@ function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => 
           </div>
         </>
       )}
+
+      {cancelModal && (
+        <CancelModal
+          startsAt={cancelModal.starts_at}
+          clientId={clientId}
+          onClose={() => setCancelModal(null)}
+          onConfirm={(hasPenalty) => doCancel(cancelModal.id, hasPenalty)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CancelModal({ startsAt, clientId, onClose, onConfirm }: {
+  startsAt: string;
+  clientId: string;
+  onClose: () => void;
+  onConfirm: (hasPenalty: boolean) => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [penalty, setPenalty] = useState(false);
+  const [feeFormatted, setFeeFormatted] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const shopId = await getBarbershopId();
+        const { data } = await supabase.from("barbershop_settings").select("cancellation_hours, cancellation_fee_cents").eq("barbershop_id", shopId).maybeSingle();
+        if (data) {
+          const hoursUntil = (new Date(startsAt).getTime() - Date.now()) / (1000 * 60 * 60);
+          const hasPenalty = hoursUntil < data.cancellation_hours;
+          setPenalty(hasPenalty);
+          setFeeFormatted(formatBRL(data.cancellation_fee_cents));
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [startsAt, clientId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-card rounded-3xl p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-destructive/15 flex items-center justify-center flex-shrink-0">
+            <X className="h-5 w-5 text-destructive" />
+          </div>
+          <h2 className="text-lg font-bold">Cancelar Agendamento</h2>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+        ) : penalty ? (
+          <div className="bg-warning/10 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" />
+              <p className="text-sm font-semibold text-warning">Atencao: cancelamento fora do prazo</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Este agendamento esta dentro do prazo minimo de cancelamento. Ao confirmar, uma penalidade de <span className="font-semibold text-foreground">{feeFormatted}</span> sera cobrada no seu proximo atendimento.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Tem certeza que deseja cancelar este agendamento?</p>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <button onClick={onClose} className="py-3 rounded-xl bg-card-elevated text-muted-foreground font-medium">Voltar</button>
+          <button
+            onClick={() => onConfirm(penalty)}
+            className="py-3 rounded-xl bg-destructive text-destructive-foreground font-semibold"
+          >
+            {penalty ? "Confirmar mesmo assim" : "Confirmar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
