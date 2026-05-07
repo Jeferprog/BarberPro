@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Calendar, Users, Scissors, BarChart3, Clock,
   Check, UserCheck, UserX, TrendingUp, DollarSign, Plus,
-  Loader2, Trash2, X, Pencil,
+  Loader2, Trash2, X, Pencil, Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { MobileShell } from "@/components/MobileShell";
@@ -14,13 +14,13 @@ export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
       { title: "BarberPro — Painel da Barbearia" },
-      { name: "description", content: "Gestão completa da sua barbearia." },
+      { name: "description", content: "Gestao completa da sua barbearia." },
     ],
   }),
   component: AdminApp,
 });
 
-type Tab = "agenda" | "barbeiros" | "servicos" | "horarios" | "relatorio";
+type Tab = "agenda" | "barbeiros" | "servicos" | "configuracoes" | "relatorio";
 type AppointmentStatus = "scheduled" | "arrived" | "completed" | "no_show" | "cancelled";
 
 type Barber = { id: string; name: string; photo_url: string | null; active: boolean };
@@ -101,13 +101,11 @@ function AdminApp() {
               {tab === "agenda" && "Agenda do Dia"}
               {tab === "barbeiros" && "Barbeiros"}
               {tab === "servicos" && "Servicos"}
-              {tab === "horarios" && "Horarios"}
+              {tab === "configuracoes" && "Configuracoes"}
               {tab === "relatorio" && "Relatorio"}
             </h1>
           </div>
-          <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">
-            X
-          </Link>
+          <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
         </div>
 
         <div className="mt-8 pb-4">
@@ -118,13 +116,12 @@ function AdminApp() {
               {tab === "agenda" && <AgendaTab shopId={shopId} />}
               {tab === "barbeiros" && <BarbersTab shopId={shopId} />}
               {tab === "servicos" && <ServicesTab shopId={shopId} />}
-              {tab === "horarios" && <HoursTab shopId={shopId} />}
+              {tab === "configuracoes" && <ConfigTab shopId={shopId} />}
               {tab === "relatorio" && <ReportTab shopId={shopId} />}
             </>
           )}
         </div>
       </div>
-
       <BottomNav tab={tab} onChange={setTab} />
     </MobileShell>
   );
@@ -139,16 +136,13 @@ function Loading() {
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-center py-12 text-sm text-muted-foreground">{children}</div>
-  );
+  return <div className="text-center py-12 text-sm text-muted-foreground">{children}</div>;
 }
 
+/* ---------------- AGENDA ---------------- */
 function AgendaTab({ shopId }: { shopId: string }) {
   const [items, setItems] = useState<AppointmentRow[] | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toLocaleDateString("en-CA")
-  );
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [photoModal, setPhotoModal] = useState<string | null>(null);
 
   const load = async () => {
@@ -168,19 +162,12 @@ function AgendaTab({ shopId }: { shopId: string }) {
   useEffect(() => { load(); }, [shopId, selectedDate]);
 
   const updateStatus = async (id: string, status: AppointmentStatus) => {
-    if (status === "completed") {
-      setPhotoModal(id);
-      return;
-    }
+    if (status === "completed") { setPhotoModal(id); return; }
     const prev = items;
     setItems((arr) => arr?.map((a) => a.id === id ? { ...a, status } : a) ?? null);
     const { error } = await supabase.from("appointments").update({ status }).eq("id", id);
-    if (error) {
-      toast.error("Erro ao atualizar status");
-      setItems(prev);
-    } else {
-      toast.success("Status atualizado");
-    }
+    if (error) { toast.error("Erro ao atualizar status"); setItems(prev); }
+    else toast.success("Status atualizado");
   };
 
   const finalizeWithPhoto = async (id: string, file: File | null) => {
@@ -189,17 +176,12 @@ function AgendaTab({ shopId }: { shopId: string }) {
       if (file) {
         const ext = file.name.split(".").pop() ?? "jpg";
         const path = `${shopId}/${id}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("appointment-photos")
-          .upload(path, file, { upsert: true });
+        const { error: upErr } = await supabase.storage.from("appointment-photos").upload(path, file, { upsert: true });
         if (upErr) throw upErr;
         const { data } = supabase.storage.from("appointment-photos").getPublicUrl(path);
         photo_url = data.publicUrl;
       }
-      const { error } = await supabase
-        .from("appointments")
-        .update({ status: "completed", photo_url })
-        .eq("id", id);
+      const { error } = await supabase.from("appointments").update({ status: "completed", photo_url }).eq("id", id);
       if (error) throw error;
       setItems((arr) => arr?.map((a) => a.id === id ? { ...a, status: "completed" as AppointmentStatus, photo_url } : a) ?? null);
       toast.success("Atendimento finalizado!");
@@ -216,34 +198,10 @@ function AgendaTab({ shopId }: { shopId: string }) {
     <>
       <div className="space-y-3">
         <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={() => {
-              const d = new Date(selectedDate + "T12:00:00");
-              d.setDate(d.getDate() - 1);
-              setSelectedDate(d.toLocaleDateString("en-CA"));
-            }}
-            className="h-9 w-9 rounded-xl bg-card flex items-center justify-center text-muted-foreground"
-          >
-            &lsaquo;
-          </button>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="flex-1 bg-card rounded-xl px-3 py-2 text-sm border border-border focus:border-primary outline-none text-center"
-          />
-          <button
-            onClick={() => {
-              const d = new Date(selectedDate + "T12:00:00");
-              d.setDate(d.getDate() + 1);
-              setSelectedDate(d.toLocaleDateString("en-CA"));
-            }}
-            className="h-9 w-9 rounded-xl bg-card flex items-center justify-center text-muted-foreground"
-          >
-            &rsaquo;
-          </button>
+          <button onClick={() => { const d = new Date(selectedDate + "T12:00:00"); d.setDate(d.getDate() - 1); setSelectedDate(d.toLocaleDateString("en-CA")); }} className="h-9 w-9 rounded-xl bg-card flex items-center justify-center text-muted-foreground">&#8249;</button>
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="flex-1 bg-card rounded-xl px-3 py-2 text-sm border border-border focus:border-primary outline-none text-center" />
+          <button onClick={() => { const d = new Date(selectedDate + "T12:00:00"); d.setDate(d.getDate() + 1); setSelectedDate(d.toLocaleDateString("en-CA")); }} className="h-9 w-9 rounded-xl bg-card flex items-center justify-center text-muted-foreground">&#8250;</button>
         </div>
-
         {items.length === 0 && <Empty>Nenhum agendamento para este dia</Empty>}
         {items.map((a) => {
           const time = new Date(a.starts_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -251,22 +209,15 @@ function AgendaTab({ shopId }: { shopId: string }) {
             <div key={a.id} className="bg-card rounded-2xl p-5" style={{ boxShadow: "var(--shadow-card)" }}>
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-primary font-semibold">
-                    <Clock className="h-4 w-4" /> {time}
-                  </div>
+                  <div className="flex items-center gap-2 text-primary font-semibold"><Clock className="h-4 w-4" /> {time}</div>
                   <div className="font-semibold mt-2">{a.clients?.name ?? "—"}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {a.services?.name ?? "—"} &bull; {a.barbers?.name ?? "—"}
-                  </div>
+                  <div className="text-sm text-muted-foreground">{a.services?.name ?? "—"} &bull; {a.barbers?.name ?? "—"}</div>
                 </div>
                 <div className="text-right">
                   <StatusBadge status={a.status} />
-                  <div className="text-xs text-muted-foreground mt-2">
-                    {a.services ? formatBRL(a.services.price_cents) : "—"}
-                  </div>
+                  <div className="text-xs text-muted-foreground mt-2">{a.services ? formatBRL(a.services.price_cents) : "—"}</div>
                 </div>
               </div>
-
               {(a.status === "scheduled" || a.status === "arrived") && (
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   <ActionBtn active={a.status === "arrived"} onClick={() => updateStatus(a.id, "arrived")} label="Chegou" />
@@ -278,13 +229,7 @@ function AgendaTab({ shopId }: { shopId: string }) {
           );
         })}
       </div>
-
-      {photoModal && (
-        <PhotoModal
-          onClose={() => setPhotoModal(null)}
-          onConfirm={(file) => finalizeWithPhoto(photoModal, file)}
-        />
-      )}
+      {photoModal && <PhotoModal onClose={() => setPhotoModal(null)} onConfirm={(file) => finalizeWithPhoto(photoModal, file)} />}
     </>
   );
 }
@@ -297,23 +242,12 @@ function PhotoModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (f
       <div className="w-full max-w-md bg-card rounded-3xl p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }} onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold">Finalizar Atendimento</h2>
         <p className="text-sm text-muted-foreground">Adicione uma foto do resultado (opcional)</p>
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="w-full text-xs text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:font-medium"
-        />
+        <input type="file" accept="image/*" capture="environment" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-xs text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:font-medium" />
         {file && <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-48 object-cover rounded-2xl" />}
         <div className="grid grid-cols-2 gap-3">
           <button onClick={onClose} className="py-3 rounded-xl bg-card-elevated text-muted-foreground font-medium">Cancelar</button>
-          <button
-            disabled={saving}
-            onClick={async () => { setSaving(true); await onConfirm(file); }}
-            className="py-3 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Finalizar
+          <button disabled={saving} onClick={async () => { setSaving(true); await onConfirm(file); }} className="py-3 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Finalizar
           </button>
         </div>
       </div>
@@ -323,11 +257,7 @@ function PhotoModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (f
 
 function ActionBtn({ label, onClick, active, variant = "default" }: { label: string; onClick: () => void; active?: boolean; variant?: "default" | "success" | "danger" }) {
   const base = "py-2.5 rounded-xl text-xs font-medium transition-colors";
-  const styles = {
-    default: active ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-card-elevated",
-    success: "bg-success/15 text-success hover:bg-success/25",
-    danger: "bg-destructive/15 text-destructive hover:bg-destructive/25",
-  }[variant];
+  const styles = { default: active ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-card-elevated", success: "bg-success/15 text-success hover:bg-success/25", danger: "bg-destructive/15 text-destructive hover:bg-destructive/25" }[variant];
   return <button onClick={onClick} className={`${base} ${styles}`}>{label}</button>;
 }
 
@@ -343,6 +273,7 @@ function StatusBadge({ status }: { status: AppointmentStatus }) {
   return <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${m.cls}`}>{m.label}</span>;
 }
 
+/* ---------------- BARBERS ---------------- */
 function BarbersTab({ shopId }: { shopId: string }) {
   const [list, setList] = useState<Barber[] | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -375,24 +306,15 @@ function BarbersTab({ shopId }: { shopId: string }) {
       <button onClick={() => setShowModal(true)} className="w-full mb-4 py-3.5 rounded-2xl border-2 border-dashed border-border text-muted-foreground flex items-center justify-center gap-2 text-sm hover:bg-card transition">
         <Plus className="h-4 w-4" /> Adicionar barbeiro
       </button>
-
       {!list ? <Loading /> : list.length === 0 ? <Empty>Nenhum barbeiro cadastrado</Empty> : (
         <div className="space-y-3">
           {list.map((b) => (
             <div key={b.id} className="bg-card rounded-2xl p-4 flex items-center gap-4" style={{ boxShadow: "var(--shadow-card)" }}>
-              {b.photo_url ? (
-                <img src={b.photo_url} alt={b.name} className="h-14 w-14 rounded-full object-cover" />
-              ) : (
-                <div className="h-14 w-14 rounded-full bg-card-elevated flex items-center justify-center text-primary font-semibold">{b.name[0]}</div>
-              )}
+              {b.photo_url ? <img src={b.photo_url} alt={b.name} className="h-14 w-14 rounded-full object-cover" /> : <div className="h-14 w-14 rounded-full bg-card-elevated flex items-center justify-center text-primary font-semibold">{b.name[0]}</div>}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">{b.name}</div>
                 <div className="text-xs mt-1">
-                  {b.active ? (
-                    <span className="text-success flex items-center gap-1"><UserCheck className="h-3.5 w-3.5" /> Ativo</span>
-                  ) : (
-                    <span className="text-muted-foreground flex items-center gap-1"><UserX className="h-3.5 w-3.5" /> Inativo</span>
-                  )}
+                  {b.active ? <span className="text-success flex items-center gap-1"><UserCheck className="h-3.5 w-3.5" /> Ativo</span> : <span className="text-muted-foreground flex items-center gap-1"><UserX className="h-3.5 w-3.5" /> Inativo</span>}
                 </div>
               </div>
               <button onClick={() => toggle(b)} className={`relative h-7 w-12 rounded-full transition-colors ${b.active ? "bg-primary" : "bg-muted"}`}>
@@ -403,10 +325,7 @@ function BarbersTab({ shopId }: { shopId: string }) {
           ))}
         </div>
       )}
-
-      {showModal && (
-        <BarberModal shopId={shopId} onClose={() => setShowModal(false)} onCreated={(b) => { setList((arr) => [...(arr ?? []), b]); setShowModal(false); }} />
-      )}
+      {showModal && <BarberModal shopId={shopId} onClose={() => setShowModal(false)} onCreated={(b) => { setList((arr) => [...(arr ?? []), b]); setShowModal(false); }} />}
     </div>
   );
 }
@@ -435,20 +354,14 @@ function BarberModal({ shopId, onClose, onCreated }: { shopId: string; onClose: 
       onCreated(data as Barber);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
     <Modal title="Novo barbeiro" onClose={onClose}>
       <div className="space-y-4">
-        <Field label="Nome">
-          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Ex.: Rafael Silva" />
-        </Field>
-        <Field label="Foto (opcional)">
-          <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-xs text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:font-medium" />
-        </Field>
+        <Field label="Nome"><input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Ex.: Rafael Silva" /></Field>
+        <Field label="Foto (opcional)"><input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-xs text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:font-medium" /></Field>
         <button disabled={saving} onClick={submit} className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
           {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
         </button>
@@ -457,6 +370,7 @@ function BarberModal({ shopId, onClose, onCreated }: { shopId: string; onClose: 
   );
 }
 
+/* ---------------- SERVICES ---------------- */
 function ServicesTab({ shopId }: { shopId: string }) {
   const [list, setList] = useState<Service[] | null>(null);
   const [editing, setEditing] = useState<Service | null>(null);
@@ -483,7 +397,6 @@ function ServicesTab({ shopId }: { shopId: string }) {
       <button onClick={() => setCreating(true)} className="w-full mb-4 py-3.5 rounded-2xl border-2 border-dashed border-border text-muted-foreground flex items-center justify-center gap-2 text-sm hover:bg-card transition">
         <Plus className="h-4 w-4" /> Adicionar servico
       </button>
-
       {!list ? <Loading /> : list.length === 0 ? <Empty>Nenhum servico cadastrado</Empty> : (
         <div className="space-y-3">
           {list.map((s) => (
@@ -501,17 +414,9 @@ function ServicesTab({ shopId }: { shopId: string }) {
           ))}
         </div>
       )}
-
       {(creating || editing) && (
-        <ServiceModal
-          shopId={shopId}
-          initial={editing ?? undefined}
-          onClose={() => { setCreating(false); setEditing(null); }}
-          onSaved={(s, isNew) => {
-            setList((arr) => { if (!arr) return [s]; return isNew ? [...arr, s] : arr.map((x) => x.id === s.id ? s : x); });
-            setCreating(false); setEditing(null);
-          }}
-        />
+        <ServiceModal shopId={shopId} initial={editing ?? undefined} onClose={() => { setCreating(false); setEditing(null); }}
+          onSaved={(s, isNew) => { setList((arr) => { if (!arr) return [s]; return isNew ? [...arr, s] : arr.map((x) => x.id === s.id ? s : x); }); setCreating(false); setEditing(null); }} />
       )}
     </div>
   );
@@ -543,23 +448,15 @@ function ServiceModal({ shopId, initial, onClose, onSaved }: { shopId: string; i
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
     <Modal title={initial ? "Editar servico" : "Novo servico"} onClose={onClose}>
       <div className="space-y-4">
-        <Field label="Nome do servico">
-          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Ex.: Corte + Barba" />
-        </Field>
-        <Field label="Duracao (min)">
-          <input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} min={5} step={5} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Ex: 20" />
-        </Field>
-        <Field label="Preco (R$)">
-          <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="50.00" />
-        </Field>
+        <Field label="Nome do servico"><input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Ex.: Corte + Barba" /></Field>
+        <Field label="Duracao (min)"><input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} min={5} step={5} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Ex: 20" /></Field>
+        <Field label="Preco (R$)"><input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="50.00" /></Field>
         <button disabled={saving} onClick={submit} className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
           {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
         </button>
@@ -568,11 +465,30 @@ function ServiceModal({ shopId, initial, onClose, onSaved }: { shopId: string; i
   );
 }
 
+/* ---------------- CONFIG TAB ---------------- */
 const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-
 type WorkingHour = { id: string; barber_id: string; day_of_week: number; start_time: string; end_time: string };
 
-function HoursTab({ shopId }: { shopId: string }) {
+function ConfigTab({ shopId }: { shopId: string }) {
+  const [section, setSection] = useState<"horarios" | "cancelamento">("horarios");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <button onClick={() => setSection("horarios")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "horarios" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>
+          Horarios
+        </button>
+        <button onClick={() => setSection("cancelamento")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "cancelamento" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>
+          Cancelamento
+        </button>
+      </div>
+      {section === "horarios" && <HoursSection shopId={shopId} />}
+      {section === "cancelamento" && <CancellationSection shopId={shopId} />}
+    </div>
+  );
+}
+
+function HoursSection({ shopId }: { shopId: string }) {
   const [barbers, setBarbers] = useState<Barber[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -608,12 +524,10 @@ function HoursTab({ shopId }: { shopId: string }) {
         const { error } = await supabase.from("working_hours").insert(toInsert);
         if (error) throw error;
       }
-      toast.success("Horarios salvos com sucesso!");
+      toast.success("Horarios salvos!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   if (!barbers) return <Loading />;
@@ -624,13 +538,10 @@ function HoursTab({ shopId }: { shopId: string }) {
         <p className="text-xs uppercase tracking-wider text-muted-foreground">Selecione o barbeiro</p>
         <div className="flex gap-2 flex-wrap">
           {barbers.map((b) => (
-            <button key={b.id} onClick={() => setSelected(b.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${selected === b.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-card-elevated"}`}>
-              {b.name}
-            </button>
+            <button key={b.id} onClick={() => setSelected(b.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${selected === b.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-card-elevated"}`}>{b.name}</button>
           ))}
         </div>
       </div>
-
       {selected && (
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Dias e horarios</p>
@@ -657,18 +568,102 @@ function HoursTab({ shopId }: { shopId: string }) {
             </div>
           ))}
           <button disabled={saving} onClick={save} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Salvar Horarios
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar Horarios
           </button>
         </div>
       )}
-
       {!selected && barbers.length > 0 && <Empty>Selecione um barbeiro para configurar os horarios</Empty>}
       {barbers.length === 0 && <Empty>Cadastre barbeiros primeiro</Empty>}
     </div>
   );
 }
 
+function CancellationSection({ shopId }: { shopId: string }) {
+  const [hours, setHours] = useState<number>(2);
+  const [fee, setFee] = useState<string>("0.00");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("barbershop_settings").select("cancellation_hours, cancellation_fee_cents").eq("barbershop_id", shopId).maybeSingle();
+      if (data) {
+        setHours(data.cancellation_hours);
+        setFee((data.cancellation_fee_cents / 100).toFixed(2));
+      }
+      setLoading(false);
+    })();
+  }, [shopId]);
+
+  const save = async () => {
+    const feeNum = parseFloat(fee.replace(",", "."));
+    if (isNaN(feeNum) || feeNum < 0) { toast.error("Valor de penalidade invalido"); return; }
+    if (hours < 0) { toast.error("Prazo invalido"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("barbershop_settings").upsert({ barbershop_id: shopId, cancellation_hours: hours, cancellation_fee_cents: Math.round(feeNum * 100), updated_at: new Date().toISOString() }, { onConflict: "barbershop_id" });
+      if (error) throw error;
+      toast.success("Politica de cancelamento salva!");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar");
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return <Loading />;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-card rounded-2xl p-5 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Prazo minimo para cancelamento</p>
+          <p className="text-xs text-muted-foreground mb-3">Cancelamentos feitos com menos de X horas de antecedencia gerao penalidade</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              value={hours}
+              onChange={(e) => setHours(Number(e.target.value))}
+              min={0}
+              step={1}
+              className="w-24 bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none text-center font-semibold"
+            />
+            <span className="text-sm text-muted-foreground">horas antes do agendamento</span>
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Valor da penalidade</p>
+          <p className="text-xs text-muted-foreground mb-3">Cobrado no proximo atendimento do cliente. Use 0 para nao cobrar penalidade</p>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground font-medium">R$</span>
+            <input
+              value={fee}
+              onChange={(e) => setFee(e.target.value)}
+              inputMode="decimal"
+              className="w-32 bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none font-semibold"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+
+        <div className="bg-primary/10 rounded-xl p-3">
+          <p className="text-xs text-primary font-medium">Resumo da politica atual:</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {hours === 0
+              ? "Cancelamentos podem gerar penalidade a qualquer momento"
+              : `Cancelamentos com menos de ${hours}h de antecedencia`}
+            {parseFloat(fee) > 0 ? ` gerao cobranca de R$${parseFloat(fee).toFixed(2)} no proximo atendimento` : " nao geram penalidade financeira"}.
+          </p>
+        </div>
+      </div>
+
+      <button disabled={saving} onClick={save} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+        {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar Politica
+      </button>
+    </div>
+  );
+}
+
+/* ---------------- REPORT ---------------- */
 function ReportTab({ shopId }: { shopId: string }) {
   const [today, setToday] = useState<{ total: number; revenue: number; completed: number } | null>(null);
   const [week, setWeek] = useState<{ total: number; revenue: number } | null>(null);
@@ -716,14 +711,8 @@ function ReportTab({ shopId }: { shopId: string }) {
       </div>
       <div className="bg-card rounded-2xl p-5" style={{ boxShadow: "var(--shadow-card)" }}>
         <div className="font-semibold mb-4">Ultimos 7 dias</div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Agendamentos</span>
-          <span className="font-semibold">{week.total}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm mt-2">
-          <span className="text-muted-foreground">Faturamento</span>
-          <span className="text-primary font-semibold">{formatBRL(week.revenue)}</span>
-        </div>
+        <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Agendamentos</span><span className="font-semibold">{week.total}</span></div>
+        <div className="flex items-center justify-between text-sm mt-2"><span className="text-muted-foreground">Faturamento</span><span className="text-primary font-semibold">{formatBRL(week.revenue)}</span></div>
       </div>
     </div>
   );
@@ -767,7 +756,7 @@ function BottomNav({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) 
     { key: "agenda", label: "Agenda", icon: <Calendar className="h-5 w-5" /> },
     { key: "barbeiros", label: "Barbeiros", icon: <Users className="h-5 w-5" /> },
     { key: "servicos", label: "Servicos", icon: <Scissors className="h-5 w-5" /> },
-    { key: "horarios", label: "Horarios", icon: <Clock className="h-5 w-5" /> },
+    { key: "configuracoes", label: "Config", icon: <Settings className="h-5 w-5" /> },
     { key: "relatorio", label: "Relatorio", icon: <BarChart3 className="h-5 w-5" /> },
   ], []);
   return (
