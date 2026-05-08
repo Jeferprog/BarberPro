@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 let cachedShopId: string | null = null;
 
 export async function getBarbershopId(): Promise<string> {
-  return "cole-o-uuid-aqui"; // ← ID da barbearia
+  return "55a73190-6680-45f7-850f-48df943920cb"; // ← ID da barbearia
 }
   if (cachedShopId) return cachedShopId;
   const { data, error } = await supabase
