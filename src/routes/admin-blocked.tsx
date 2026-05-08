@@ -169,7 +169,7 @@ function BlockedScreen({ reason, blockedAt }: { reason: string; blockedAt: strin
               <p className="text-sm font-semibold mb-1">Para reativar sua conta:</p>
               <p className="text-xs text-muted-foreground">Entre em contato pelo WhatsApp</p>
               <a 
-                href="https://wa.me/5551999999999?text=Olá, preciso reativar minha conta BarberPro" 
+                href="https://wa.me/5555999279459?text=Olá, preciso reativar minha conta BarberPro" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="mt-3 w-full py-2.5 rounded-xl bg-success text-success-foreground font-medium text-sm flex items-center justify-center gap-2 hover:bg-success/90 transition"
