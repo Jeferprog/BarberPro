@@ -26,6 +26,7 @@ type Barbershop = {
   blocked_reason: string | null;
   blocked_at: string | null;
   created_at: string;
+  due_date: string | null;
   settings?: {
     cancellation_hours: number;
     cancellation_fee_cents: number;
@@ -56,7 +57,7 @@ function MasterPanel() {
       const { data: shopsData, error } = await supabase
         .from('barbershops')
         .select(`
-          id, name, active, blocked_reason, blocked_at, created_at,
+          id, name, active, blocked_reason, blocked_at, created_at, due_date,
           barbershop_settings (cancellation_hours, cancellation_fee_cents)
         `)
         .order('created_at', { ascending: false });
@@ -342,6 +343,36 @@ function ShopCard({ shop, onToggle, onDelete, onDetails }: {
   onDetails: () => void;
 }) {
   const [showId, setShowId] = useState(false);
+  const [editingDueDate, setEditingDueDate] = useState(false);
+  const [dueDate, setDueDate] = useState(shop.due_date || "");
+
+  const saveDueDate = async () => {
+    try {
+      const { error } = await supabase
+        .from('barbershops')
+        .update({ due_date: dueDate || null })
+        .eq('id', shop.id);
+
+      if (error) throw error;
+      toast.success("Vencimento atualizado");
+      setEditingDueDate(false);
+      shop.due_date = dueDate || null;
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao atualizar");
+    }
+  };
+
+  const getDaysUntilDue = () => {
+    if (!shop.due_date) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(shop.due_date + 'T00:00:00');
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const daysUntilDue = getDaysUntilDue();
 
   return (
     <div className="bg-card rounded-2xl p-6" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -403,6 +434,61 @@ function ShopCard({ shop, onToggle, onDelete, onDetails }: {
             </div>
           </div>
 
+          {/* Vencimento */}
+          <div className="mt-4">
+            {editingDueDate ? (
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="bg-background rounded-xl px-3 py-2 text-sm border border-border focus:border-primary outline-none"
+                />
+                <button 
+                  onClick={saveDueDate}
+                  className="px-3 py-2 rounded-xl bg-success text-success-foreground text-sm"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={() => { setEditingDueDate(false); setDueDate(shop.due_date || ""); }}
+                  className="px-3 py-2 rounded-xl bg-card-elevated text-muted-foreground text-sm"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {shop.due_date ? (
+                  <>
+                    <span className="text-xs text-muted-foreground">
+                      Vencimento: {new Date(shop.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                    {daysUntilDue !== null && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        daysUntilDue < 0 ? 'bg-destructive/15 text-destructive' :
+                        daysUntilDue <= 3 ? 'bg-warning/15 text-warning' :
+                        'bg-success/15 text-success'
+                      }`}>
+                        {daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} dias atrasado` :
+                         daysUntilDue === 0 ? 'Vence hoje' :
+                         `${daysUntilDue} dias restantes`}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Sem vencimento definido</span>
+                )}
+                <button 
+                  onClick={() => setEditingDueDate(true)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Editar
+                </button>
+              </div>
+            )}
+          </div>
+
           {shop.settings && (
             <div className="mt-3 text-xs text-muted-foreground">
               Política: {shop.settings.cancellation_hours}h de prazo, 
@@ -460,10 +546,22 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
     setSaving(true);
     try {
+      // Gera slug a partir do nome
+      const slug = name.trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .replace(/[^a-z0-9]+/g, '-')      // Substitui não-alfanuméricos por -
+        .replace(/^-+|-+$/g, '');          // Remove - do início/fim
+
       // Cria barbearia
       const { data: shop, error: shopError } = await supabase
         .from('barbershops')
-        .insert({ name: name.trim(), active: true })
+        .insert({ 
+          name: name.trim(), 
+          slug: slug || crypto.randomUUID().slice(0, 8),
+          active: true 
+        })
         .select('id, name')
         .single();
 
@@ -563,7 +661,7 @@ function DetailsModal({ shopId, onClose }: { shopId: string; onClose: () => void
       const { data } = await supabase
         .from('barbershops')
         .select(`
-          id, name, active, blocked_reason, blocked_at, created_at,
+          id, name, active, blocked_reason, blocked_at, created_at, due_date,
           barbershop_settings (cancellation_hours, cancellation_fee_cents)
         `)
         .eq('id', shopId)
@@ -606,6 +704,14 @@ function DetailsModal({ shopId, onClose }: { shopId: string; onClose: () => void
           <DetailRow label="ID" value={shop.id} mono />
           <DetailRow label="Status" value={shop.active ? "Ativa" : "Bloqueada"} />
           {shop.blocked_reason && <DetailRow label="Motivo do Bloqueio" value={shop.blocked_reason} />}
+          {shop.due_date && (
+            <DetailRow 
+              label="Vencimento" 
+              value={new Date(shop.due_date + 'T00:00:00').toLocaleDateString('pt-BR', { 
+                day: '2-digit', month: 'long', year: 'numeric' 
+              })} 
+            />
+          )}
           <DetailRow 
             label="Criada em" 
             value={new Date(shop.created_at).toLocaleDateString('pt-BR', { 
