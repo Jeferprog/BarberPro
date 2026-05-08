@@ -738,12 +738,12 @@ function DetailsModal({ shopId, onClose }: { shopId: string; onClose: () => void
           </div>
           <DetailRow 
             label="Painel Admin" 
-            value={`${window.location.origin}/admin`}
+            value={`${window.location.origin}/admin?shop=${shop.id}`}
             copyable
           />
           <DetailRow 
             label="App Cliente" 
-            value={`${window.location.origin}/app`}
+            value={`${window.location.origin}/app?shop=${shop.id}`}
             copyable
           />
         </div>
