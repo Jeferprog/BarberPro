@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { MobileShell } from "@/components/MobileShell";
 import { supabase } from "@/integrations/supabase/client";
 import { getBarbershopId, formatBRL } from "@/lib/barbershop";
+import { InstallPWA } from "@/components/InstallPWA";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -107,35 +108,38 @@ function AdminApp() {
   }
 
   return (
-    <MobileShell withBottomNav>
-      <div className="px-6 pt-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Painel</p>
-            <h1 className="text-2xl font-bold">
-              {tab === "agenda" && "Agenda do Dia"}
-              {tab === "barbeiros" && "Barbeiros"}
-              {tab === "servicos" && "Servicos"}
-              {tab === "configuracoes" && "Configuracoes"}
-              {tab === "relatorio" && "Relatorio"}
-            </h1>
+    <>
+      <MobileShell withBottomNav>
+        <div className="px-6 pt-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Painel</p>
+              <h1 className="text-2xl font-bold">
+                {tab === "agenda" && "Agenda do Dia"}
+                {tab === "barbeiros" && "Barbeiros"}
+                {tab === "servicos" && "Servicos"}
+                {tab === "configuracoes" && "Configuracoes"}
+                {tab === "relatorio" && "Relatorio"}
+              </h1>
+            </div>
+            <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
           </div>
-          <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
+          <div className="mt-8 pb-4">
+            {!shopId ? <Loading /> : (
+              <>
+                {tab === "agenda" && <AgendaTab shopId={shopId} />}
+                {tab === "barbeiros" && <BarbersTab shopId={shopId} />}
+                {tab === "servicos" && <ServicesTab shopId={shopId} />}
+                {tab === "configuracoes" && <ConfigTab shopId={shopId} />}
+                {tab === "relatorio" && <ReportTab shopId={shopId} />}
+              </>
+            )}
+          </div>
         </div>
-        <div className="mt-8 pb-4">
-          {!shopId ? <Loading /> : (
-            <>
-              {tab === "agenda" && <AgendaTab shopId={shopId} />}
-              {tab === "barbeiros" && <BarbersTab shopId={shopId} />}
-              {tab === "servicos" && <ServicesTab shopId={shopId} />}
-              {tab === "configuracoes" && <ConfigTab shopId={shopId} />}
-              {tab === "relatorio" && <ReportTab shopId={shopId} />}
-            </>
-          )}
-        </div>
-      </div>
-      <BottomNav tab={tab} onChange={setTab} />
-    </MobileShell>
+        <BottomNav tab={tab} onChange={setTab} />
+      </MobileShell>
+      <InstallPWA />
+    </>
   );
 }
 
@@ -169,7 +173,7 @@ function BlockedScreen({ reason, blockedAt }: { reason: string; blockedAt: strin
               <p className="text-sm font-semibold mb-1">Para reativar sua conta:</p>
               <p className="text-xs text-muted-foreground">Entre em contato pelo WhatsApp</p>
               <a 
-                href="https://wa.me/5555999279459?text=Olá, preciso reativar minha conta BarberPro" 
+                href="https://wa.me/5551999999999?text=Olá, preciso reativar minha conta BarberPro" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="mt-3 w-full py-2.5 rounded-xl bg-success text-success-foreground font-medium text-sm flex items-center justify-center gap-2 hover:bg-success/90 transition"
