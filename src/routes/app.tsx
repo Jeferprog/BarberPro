@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Phone, Calendar, Clock, ChevronRight, ArrowLeft, X, Scissors, Loader2, AlertTriangle } from "lucide-react";
+import { Calendar, Clock, ChevronRight, ArrowLeft, X, Scissors, Loader2, AlertTriangle } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { supabase } from "@/integrations/supabase/client";
 import { getBarbershopId, formatBRL } from "@/lib/barbershop";
@@ -17,17 +17,13 @@ export const Route = createFileRoute("/app")({
 });
 
 type Screen = "login" | "home" | "booking" | "appointments";
-
 type Service = { id: string; name: string; duration_minutes: number; price_cents: number };
 type Barber  = { id: string; name: string; photo_url: string | null };
 type Appointment = {
-  id: string;
-  starts_at: string;
-  status: string;
-  photo_url?: string | null;
-  has_penalty?: boolean;
+  id: string; starts_at: string; status: string;
+  photo_url?: string | null; has_penalty?: boolean;
   services: { name: string; price_cents: number } | null;
-  barbers:  { name: string } | null;
+  barbers: { name: string } | null;
 };
 
 const CLIENT_SESSION_MS = 2 * 60 * 60 * 1000;
@@ -53,25 +49,17 @@ function ClientApp() {
   const [screen, setScreen] = useState<Screen>(() => getClientSession() ? "home" : "login");
   const [clientId, setClientId] = useState<string | null>(() => getClientSession()?.id ?? null);
   const [clientName, setClientName] = useState(() => getClientSession()?.name ?? "");
-
   return (
     <MobileShell>
-      {screen === "login" && (
-        <Login onLogin={(id, name) => { saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home"); }} />
-      )}
-      {screen === "home" && (
-        <Home name={clientName} clientId={clientId!} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />
-      )}
-      {screen === "booking" && (
-        <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />
-      )}
-      {screen === "appointments" && (
-        <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />
-      )}
+      {screen === "login" && <Login onLogin={(id, name) => { saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home"); }} />}
+      {screen === "home" && <Home name={clientName} clientId={clientId!} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />}
+      {screen === "booking" && <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />}
+      {screen === "appointments" && <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />}
     </MobileShell>
   );
 }
 
+/* ---------------- LOGIN ---------------- */
 function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   const phoneRef = useRef<HTMLInputElement>(null);
   const [phoneDisplay, setPhoneDisplay] = useState("");
@@ -80,11 +68,11 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   const [needName, setNeedName] = useState(false);
 
   const formatPhone = useCallback((v: string) => {
-    const numbers = v.replace(/\D/g, "");
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    if (numbers.length <= 11) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+    const n = v.replace(/\D/g, "");
+    if (n.length <= 2) return n;
+    if (n.length <= 7) return `(${n.slice(0,2)}) ${n.slice(2)}`;
+    if (n.length <= 11) return `(${n.slice(0,2)}) ${n.slice(2,7)}-${n.slice(7)}`;
+    return `(${n.slice(0,2)}) ${n.slice(2,7)}-${n.slice(7,11)}`;
   }, []);
 
   const handlePhoneInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,11 +80,7 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
     const prevLen = input.value.length;
     const formatted = formatPhone(input.value);
     setPhoneDisplay(formatted);
-    requestAnimationFrame(() => {
-      if (input && formatted.length >= prevLen) {
-        input.setSelectionRange(formatted.length, formatted.length);
-      }
-    });
+    requestAnimationFrame(() => { if (input && formatted.length >= prevLen) input.setSelectionRange(formatted.length, formatted.length); });
   }, [formatPhone]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -110,24 +94,17 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
     try {
       const { data: existing } = await supabase.from("clients").select("id, name").eq("phone", cleaned).maybeSingle();
       if (existing) {
-        const nomeInformado = name.trim().toLowerCase();
-        const nomeCadastrado = existing.name.toLowerCase();
-        if (!nomeCadastrado.includes(nomeInformado) && !nomeInformado.includes(nomeCadastrado)) {
-          toast.error("Nome nao confere com o cadastro.");
-          setLoading(false);
-          return;
-        }
+        const inf = name.trim().toLowerCase(); const cad = existing.name.toLowerCase();
+        if (!cad.includes(inf) && !inf.includes(cad)) { toast.error("Nome nao confere com o cadastro."); setLoading(false); return; }
         toast.success(`Bem-vindo de volta, ${existing.name}!`);
-        onLogin(existing.id, existing.name);
-        return;
+        onLogin(existing.id, existing.name); return;
       }
       const { data: created, error: insertError } = await supabase.from("clients").insert({ phone: cleaned, name: name.trim() }).select("id, name").single();
       if (insertError) throw insertError;
       toast.success(`Bem-vindo, ${created.name}!`);
       onLogin(created.id, created.name);
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao tentar entrar");
-    } finally { setLoading(false); }
+    } catch (e: any) { toast.error(e.message || "Erro ao tentar entrar"); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -163,23 +140,19 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
   );
 }
 
+/* ---------------- HOME ---------------- */
 function Home({ name, clientId, onBook, onAppointments }: { name: string; clientId: string; onBook: () => void; onAppointments: () => void }) {
   const [upcoming, setUpcoming] = useState<Appointment[]>([]);
-
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("appointments").select("id, starts_at, status, services(name, price_cents), barbers(name)").eq("client_id", clientId).eq("status", "scheduled").gte("starts_at", new Date().toISOString()).order("starts_at", { ascending: true }).limit(2);
       if (data) setUpcoming(data as unknown as Appointment[]);
     })();
   }, [clientId]);
-
   return (
     <div className="px-6 py-10">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-muted-foreground text-sm">Ola,</p>
-          <h1 className="text-2xl font-bold">{name}</h1>
-        </div>
+        <div><p className="text-muted-foreground text-sm">Ola,</p><h1 className="text-2xl font-bold">{name}</h1></div>
         <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
       </div>
       <button onClick={onBook} className="mt-8 w-full p-6 rounded-3xl text-left text-primary-foreground relative overflow-hidden" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
@@ -193,21 +166,17 @@ function Home({ name, clientId, onBook, onAppointments }: { name: string; client
           <h2 className="font-semibold">Proximos Agendamentos</h2>
           <button onClick={onAppointments} className="text-xs text-primary">Ver todos</button>
         </div>
-        {upcoming.length === 0 ? (
-          <div className="bg-card rounded-2xl p-6 text-center text-muted-foreground text-sm">Nenhum agendamento futuro.</div>
-        ) : (
-          <div className="space-y-3">{upcoming.map((a) => <AppointmentCard key={a.id} appt={a} />)}</div>
-        )}
+        {upcoming.length === 0 ? <div className="bg-card rounded-2xl p-6 text-center text-muted-foreground text-sm">Nenhum agendamento futuro.</div> : <div className="space-y-3">{upcoming.map((a) => <AppointmentCard key={a.id} appt={a} />)}</div>}
       </div>
     </div>
   );
 }
 
+/* ---------------- APPOINTMENT CARD ---------------- */
 function AppointmentCard({ appt, onCancel, showPhoto }: { appt: Appointment; onCancel?: () => void; showPhoto?: boolean }) {
   const dt = new Date(appt.starts_at);
   const dateStr = dt.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
   const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-
   return (
     <div className="bg-card rounded-2xl p-5" style={{ boxShadow: "var(--shadow-card)" }}>
       <div className="flex items-start justify-between">
@@ -221,46 +190,44 @@ function AppointmentCard({ appt, onCancel, showPhoto }: { appt: Appointment; onC
           <div className="text-xs text-muted-foreground mt-1">{appt.services ? formatBRL(appt.services.price_cents) : "—"}</div>
         </div>
       </div>
-      {appt.has_penalty && appt.status === "scheduled" && (
-        <div className="mt-3 flex items-center gap-2 bg-warning/10 rounded-xl px-3 py-2">
-          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-          <p className="text-xs text-warning">Penalidade de cancelamento sera cobrada no proximo atendimento</p>
-        </div>
-      )}
       {onCancel && appt.status === "scheduled" && (
         <button onClick={onCancel} className="mt-4 w-full py-2.5 rounded-xl bg-destructive/10 text-destructive text-sm font-medium flex items-center justify-center gap-1">
           <X className="h-4 w-4" /> Cancelar agendamento
         </button>
       )}
-      {appt.status === "cancelled" && (
-        <div className="mt-3"><span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Cancelado</span></div>
-      )}
-      {showPhoto && appt.photo_url && (
-        <div className="mt-4"><img src={appt.photo_url} alt="Foto do corte" className="w-full rounded-2xl object-cover max-h-64" /></div>
-      )}
+      {appt.status === "cancelled" && <div className="mt-3"><span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Cancelado</span></div>}
+      {showPhoto && appt.photo_url && <div className="mt-4"><img src={appt.photo_url} alt="Foto do corte" className="w-full rounded-2xl object-cover max-h-64" /></div>}
     </div>
   );
 }
 
+/* ---------------- BOOKING ---------------- */
 function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () => void; onDone: () => void }) {
-  const [step, setStep]         = useState(1);
-  const [service, setService]   = useState<Service | null>(null);
-  const [barber, setBarber]     = useState<Barber | null>(null);
-  const [date, setDate]         = useState<string>("");
-  const [slot, setSlot]         = useState<string | null>(null);
+  const [step, setStep] = useState(1);
+  const [service, setService] = useState<Service | null>(null);
+  const [barber, setBarber] = useState<Barber | null>(null);
+  const [date, setDate] = useState<string>("");
+  const [slot, setSlot] = useState<string | null>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [barbers, setBarbers]   = useState<Barber[]>([]);
-  const [slots, setSlots]       = useState<string[]>([]);
-  const [loading, setLoading]   = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [shopId, setShopId]     = useState<string | null>(null);
+  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [shopId, setShopId] = useState<string | null>(null);
+  const [pendingPenalty, setPendingPenalty] = useState(0);
 
-  const dates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() + i);
-    return d.toISOString().split("T")[0];
-  });
+  const dates = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i); return d.toISOString().split("T")[0]; });
 
   useEffect(() => { getBarbershopId().then(setShopId); }, []);
+
+  // Busca multas pendentes do cliente ao abrir o booking
+  useEffect(() => {
+    if (!shopId || !clientId) return;
+    (async () => {
+      const { data } = await supabase.from("client_penalties").select("amount_cents").eq("client_id", clientId).eq("barbershop_id", shopId).eq("status", "pending");
+      if (data) setPendingPenalty(data.reduce((s, p) => s + p.amount_cents, 0));
+    })();
+  }, [shopId, clientId]);
 
   useEffect(() => {
     if (!shopId) return;
@@ -298,16 +265,18 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
       if (error) throw error;
       toast.success("Agendamento confirmado!");
       onDone();
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Erro ao agendar");
-    } finally { setSaving(false); }
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Erro ao agendar"); }
+    finally { setSaving(false); }
   };
 
   const next = () => setStep((s) => s + 1);
   const canContinue = (step === 1 && !!service) || (step === 2 && !!barber) || (step === 3 && !!slot);
+  const isLastStep = step === 3;
+  const serviceCents = service?.price_cents ?? 0;
+  const totalCents = serviceCents + pendingPenalty;
 
   return (
-    <div className="px-6 py-8 pb-24">
+    <div className="px-6 py-8 pb-36">
       <div className="flex items-center gap-3">
         <button onClick={step === 1 ? onBack : () => setStep((s) => s - 1)} className="h-10 w-10 rounded-full bg-card flex items-center justify-center"><ArrowLeft className="h-5 w-5" /></button>
         <div>
@@ -315,9 +284,11 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
           <div className="font-semibold">{step === 1 ? "Escolha o servico" : step === 2 ? "Escolha o barbeiro" : "Escolha o horario"}</div>
         </div>
       </div>
+
       <div className="mt-5 flex gap-2">
-        {[1, 2, 3].map((n) => <div key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-primary" : "bg-card"}`} />)}
+        {[1,2,3].map((n) => <div key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-primary" : "bg-card"}`} />)}
       </div>
+
       <div className="mt-8 space-y-3">
         {step === 1 && services.map((s) => (
           <button key={s.id} onClick={() => setService(s)} className={`w-full p-5 rounded-2xl bg-card text-left flex items-center justify-between transition-all ${service?.id === s.id ? "ring-2 ring-primary" : ""}`} style={{ boxShadow: "var(--shadow-card)" }}>
@@ -325,6 +296,7 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
             <div className="text-primary font-semibold">{formatBRL(s.price_cents)}</div>
           </button>
         ))}
+
         {step === 2 && (
           <div className="grid grid-cols-2 gap-3">
             {barbers.map((b) => (
@@ -335,6 +307,7 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
             ))}
           </div>
         )}
+
         {step === 3 && (
           <>
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6">
@@ -357,13 +330,34 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
                 ))}
               </div>
             )}
+
+            {/* Resumo de pagamento com penalidade */}
+            {slot && pendingPenalty > 0 && (
+              <div className="mt-4 bg-card rounded-2xl p-4 space-y-2" style={{ boxShadow: "var(--shadow-card)" }}>
+                <p className="text-sm font-semibold">Resumo do pagamento</p>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">{service?.name}</span><span>{formatBRL(serviceCents)}</span></div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-warning flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Multa pendente</span>
+                  <span className="text-warning">{formatBRL(pendingPenalty)}</span>
+                </div>
+                <div className="border-t border-border pt-2 flex justify-between font-semibold">
+                  <span>Total a pagar</span><span className="text-primary">{formatBRL(totalCents)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground pt-1">A multa sera cobrada pelo barbeiro no dia do atendimento.</p>
+              </div>
+            )}
           </>
         )}
       </div>
-      <button disabled={!canContinue || saving} onClick={step === 3 ? confirm : next} className="fixed bottom-6 left-6 right-6 max-w-[382px] mx-auto py-4 rounded-2xl font-semibold text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center gap-3" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
-        {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-        {step === 3 ? "Confirmar Agendamento" : "Continuar"}
-      </button>
+
+      <div className="fixed bottom-6 left-6 right-6 max-w-[382px] mx-auto space-y-2">
+        <button disabled={!canContinue || saving} onClick={isLastStep ? confirm : next}
+          className="w-full py-4 rounded-2xl font-semibold text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center gap-3"
+          style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          {isLastStep ? (pendingPenalty > 0 ? `Confirmar — ${formatBRL(totalCents)}` : "Confirmar Agendamento") : "Continuar"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -388,14 +382,22 @@ function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => 
     })();
   }, [clientId]);
 
-  const requestCancel = (appt: Appointment) => {
-    setCancelModal({ id: appt.id, starts_at: appt.starts_at });
-  };
-
   const doCancel = async (id: string, hasPenalty: boolean) => {
+    const shopId = await getBarbershopId();
+    const appt = upcoming.find((a) => a.id === id);
+
     const { error } = await supabase.from("appointments").update({ status: "cancelled", has_penalty: hasPenalty }).eq("id", id);
     if (error) { toast.error("Erro ao cancelar"); return; }
-    toast.success(hasPenalty ? "Agendamento cancelado. Penalidade sera cobrada no proximo atendimento." : "Agendamento cancelado.");
+
+    // Se tiver penalidade, registra na tabela client_penalties
+    if (hasPenalty && shopId && appt) {
+      const { data: settings } = await supabase.from("barbershop_settings").select("cancellation_fee_cents").eq("barbershop_id", shopId).maybeSingle();
+      if (settings && settings.cancellation_fee_cents > 0) {
+        await supabase.from("client_penalties").insert({ client_id: clientId, barbershop_id: shopId, source_appointment_id: id, amount_cents: settings.cancellation_fee_cents });
+      }
+    }
+
+    toast.success(hasPenalty ? "Cancelado. Multa sera cobrada no proximo atendimento." : "Agendamento cancelado.");
     setUpcoming((arr) => arr.filter((a) => a.id !== id));
     setCancelModal(null);
   };
@@ -416,9 +418,7 @@ function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => 
             {upcoming.length === 0 ? (
               <div className="bg-card rounded-2xl p-5 text-center text-muted-foreground text-sm">Nenhum agendamento futuro</div>
             ) : (
-              <div className="space-y-3">
-                {upcoming.map((a) => <AppointmentCard key={a.id} appt={a} onCancel={() => requestCancel(a)} />)}
-              </div>
+              <div className="space-y-3">{upcoming.map((a) => <AppointmentCard key={a.id} appt={a} onCancel={() => setCancelModal({ id: a.id, starts_at: a.starts_at })} />)}</div>
             )}
           </div>
           <div>
@@ -433,24 +433,15 @@ function MyAppointments({ clientId, onBack }: { clientId: string; onBack: () => 
       )}
 
       {cancelModal && (
-        <CancelModal
-          startsAt={cancelModal.starts_at}
-          clientId={clientId}
-          onClose={() => setCancelModal(null)}
-          onConfirm={(hasPenalty) => doCancel(cancelModal.id, hasPenalty)}
-        />
+        <CancelModal startsAt={cancelModal.starts_at} onClose={() => setCancelModal(null)} onConfirm={(hasPenalty) => doCancel(cancelModal.id, hasPenalty)} />
       )}
     </div>
   );
 }
 
-function CancelModal({ startsAt, clientId, onClose, onConfirm }: {
-  startsAt: string;
-  clientId: string;
-  onClose: () => void;
-  onConfirm: (hasPenalty: boolean) => void;
-}) {
-  const [loading, setLoading] = useState(true);
+/* ---------------- CANCEL MODAL ---------------- */
+function CancelModal({ startsAt, onClose, onConfirm }: { startsAt: string; onClose: () => void; onConfirm: (hasPenalty: boolean) => void }) {
+  const [loadingPolicy, setLoadingPolicy] = useState(true);
   const [penalty, setPenalty] = useState(false);
   const [feeFormatted, setFeeFormatted] = useState("");
 
@@ -461,37 +452,28 @@ function CancelModal({ startsAt, clientId, onClose, onConfirm }: {
         const { data } = await supabase.from("barbershop_settings").select("cancellation_hours, cancellation_fee_cents").eq("barbershop_id", shopId).maybeSingle();
         if (data) {
           const hoursUntil = (new Date(startsAt).getTime() - Date.now()) / (1000 * 60 * 60);
-          const hasPenalty = hoursUntil < data.cancellation_hours;
+          const hasPenalty = hoursUntil < data.cancellation_hours && data.cancellation_fee_cents > 0;
           setPenalty(hasPenalty);
           setFeeFormatted(formatBRL(data.cancellation_fee_cents));
         }
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoadingPolicy(false); }
     })();
-  }, [startsAt, clientId]);
+  }, [startsAt]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div className="w-full max-w-md bg-card rounded-3xl p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-destructive/15 flex items-center justify-center flex-shrink-0">
-            <X className="h-5 w-5 text-destructive" />
-          </div>
+          <div className="h-10 w-10 rounded-full bg-destructive/15 flex items-center justify-center flex-shrink-0"><X className="h-5 w-5 text-destructive" /></div>
           <h2 className="text-lg font-bold">Cancelar Agendamento</h2>
         </div>
 
-        {loading ? (
+        {loadingPolicy ? (
           <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
         ) : penalty ? (
           <div className="bg-warning/10 rounded-2xl p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" />
-              <p className="text-sm font-semibold text-warning">Atencao: cancelamento fora do prazo</p>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Este agendamento esta dentro do prazo minimo de cancelamento. Ao confirmar, uma penalidade de <span className="font-semibold text-foreground">{feeFormatted}</span> sera cobrada no seu proximo atendimento.
-            </p>
+            <div className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" /><p className="text-sm font-semibold text-warning">Cancelamento fora do prazo</p></div>
+            <p className="text-sm text-muted-foreground">Este cancelamento esta dentro do prazo minimo. Uma multa de <span className="font-semibold text-foreground">{feeFormatted}</span> sera cobrada no seu proximo atendimento.</p>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Tem certeza que deseja cancelar este agendamento?</p>
@@ -499,10 +481,7 @@ function CancelModal({ startsAt, clientId, onClose, onConfirm }: {
 
         <div className="grid grid-cols-2 gap-3 pt-2">
           <button onClick={onClose} className="py-3 rounded-xl bg-card-elevated text-muted-foreground font-medium">Voltar</button>
-          <button
-            onClick={() => onConfirm(penalty)}
-            className="py-3 rounded-xl bg-destructive text-destructive-foreground font-semibold"
-          >
+          <button onClick={() => onConfirm(penalty)} className="py-3 rounded-xl bg-destructive text-destructive-foreground font-semibold">
             {penalty ? "Confirmar mesmo assim" : "Confirmar"}
           </button>
         </div>
