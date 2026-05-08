@@ -5,6 +5,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { supabase } from "@/integrations/supabase/client";
 import { getBarbershopId, formatBRL } from "@/lib/barbershop";
 import { toast } from "sonner";
+import { InstallPWA } from "@/components/InstallPWA";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -50,12 +51,15 @@ function ClientApp() {
   const [clientId, setClientId] = useState<string | null>(() => getClientSession()?.id ?? null);
   const [clientName, setClientName] = useState(() => getClientSession()?.name ?? "");
   return (
-    <MobileShell>
-      {screen === "login" && <Login onLogin={(id, name) => { saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home"); }} />}
-      {screen === "home" && <Home name={clientName} clientId={clientId!} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />}
-      {screen === "booking" && <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />}
-      {screen === "appointments" && <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />}
-    </MobileShell>
+    <>
+      <MobileShell>
+        {screen === "login" && <Login onLogin={(id, name) => { saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home"); }} />}
+        {screen === "home" && <Home name={clientName} clientId={clientId!} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />}
+        {screen === "booking" && <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />}
+        {screen === "appointments" && <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />}
+      </MobileShell>
+      <InstallPWA />
+    </>
   );
 }
 
