@@ -656,15 +656,17 @@ const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 type WorkingHour = { id: string; barber_id: string; day_of_week: number; start_time: string; end_time: string };
 
 function ConfigTab({ shopId }: { shopId: string }) {
-  const [section, setSection] = useState<"horarios" | "cancelamento">("horarios");
+  const [section, setSection] = useState<"horarios" | "cancelamento" | "lembretes">("horarios");
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
         <button onClick={() => setSection("horarios")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "horarios" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>Horarios</button>
         <button onClick={() => setSection("cancelamento")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "cancelamento" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>Cancelamento</button>
+        <button onClick={() => setSection("lembretes")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "lembretes" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>Lembretes</button>
       </div>
       {section === "horarios" && <HoursSection shopId={shopId} />}
       {section === "cancelamento" && <CancellationSection shopId={shopId} />}
+      {section === "lembretes" && <ReminderSection shopId={shopId} />}
     </div>
   );
 }
@@ -788,6 +790,57 @@ function CancellationSection({ shopId }: { shopId: string }) {
         </div>
       </div>
       <button disabled={saving} onClick={save} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar Politica</button>
+    </div>
+  );
+}
+
+function ReminderSection({ shopId }: { shopId: string }) {
+  const [reminderHours, setReminderHours] = useState<number>(2);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("barbershop_settings").select("reminder_hours").eq("barbershop_id", shopId).maybeSingle();
+      if (data && data.reminder_hours !== undefined) setReminderHours(data.reminder_hours);
+      setLoading(false);
+    })();
+  }, [shopId]);
+
+  const save = async () => {
+    if (reminderHours < 0) { toast.error("Valor invalido"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("barbershop_settings").upsert({ barbershop_id: shopId, reminder_hours: reminderHours, updated_at: new Date().toISOString() }, { onConflict: "barbershop_id" });
+      if (error) throw error;
+      toast.success("Lembrete configurado!");
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Erro ao salvar"); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <Loading />;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-card rounded-2xl p-5 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Lembrete automatico</p>
+          <p className="text-xs text-muted-foreground mb-3">O cliente recebe uma notificacao X horas antes do agendamento. Use 0 para desativar.</p>
+          <div className="flex items-center gap-3">
+            <input type="number" value={reminderHours} onChange={(e) => setReminderHours(Number(e.target.value))} min={0} step={1} className="w-24 bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none text-center font-semibold" />
+            <span className="text-sm text-muted-foreground">horas antes do agendamento</span>
+          </div>
+        </div>
+        <div className="bg-primary/10 rounded-xl p-3">
+          <p className="text-xs text-primary font-medium">Configuracao atual:</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {reminderHours === 0
+              ? "Lembretes desativados. Os clientes nao receberao aviso antes do agendamento."
+              : `Os clientes receberao uma notificacao ${reminderHours}h antes do horario marcado.`}
+          </p>
+        </div>
+      </div>
+      <button disabled={saving} onClick={save} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar Lembrete</button>
     </div>
   );
 }
