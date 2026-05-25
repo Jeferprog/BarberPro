@@ -4,12 +4,14 @@ import {
   Calendar, Users, Scissors, BarChart3, Clock,
   Check, UserCheck, UserX, TrendingUp, DollarSign, Plus,
   Loader2, Trash2, X, Pencil, Settings, AlertTriangle, Lock,
+  Megaphone, Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { MobileShell } from "@/components/MobileShell";
 import { supabase } from "@/integrations/supabase/client";
 import { getBarbershopId, formatBRL } from "@/lib/barbershop";
 import { InstallPWA } from "@/components/InstallPWA";
+import { createNotification, createBulkNotification } from "@/lib/push";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -46,6 +48,7 @@ function AdminApp() {
   const [shopId, setShopId] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<{ reason: string; blocked_at: string } | null>(null);
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
 
   useEffect(() => {
     if (!authorized) return;
@@ -122,7 +125,12 @@ function AdminApp() {
                 {tab === "relatorio" && "Relatorio"}
               </h1>
             </div>
-            <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowAnnouncement(true)} className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground" title="Enviar aviso">
+                <Megaphone className="h-5 w-5" />
+              </button>
+              <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
+            </div>
           </div>
           <div className="mt-8 pb-4">
             {!shopId ? <Loading /> : (
@@ -138,8 +146,47 @@ function AdminApp() {
         </div>
         <BottomNav tab={tab} onChange={setTab} />
       </MobileShell>
+      {showAnnouncement && shopId && (
+        <AnnouncementModal shopId={shopId} onClose={() => setShowAnnouncement(false)} />
+      )}
       <InstallPWA />
     </>
+  );
+}
+
+function AnnouncementModal({ shopId, onClose }: { shopId: string; onClose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const send = async () => {
+    if (!title.trim() || !body.trim()) { toast.error("Preencha titulo e mensagem"); return; }
+    setSending(true);
+    try {
+      const count = await createBulkNotification({ barbershopId: shopId, title: title.trim(), body: body.trim(), type: "announcement" });
+      toast.success(`Aviso enviado para ${count} cliente${count !== 1 ? "s" : ""}!`);
+      onClose();
+    } catch { toast.error("Erro ao enviar aviso"); }
+    finally { setSending(false); }
+  };
+
+  return (
+    <Modal title="Enviar Aviso" onClose={onClose}>
+      <div className="space-y-4">
+        <Field label="Titulo do aviso">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Ex.: Promocao de verao!" />
+        </Field>
+        <Field label="Mensagem">
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none resize-none" placeholder="Descreva o aviso para seus clientes..." />
+        </Field>
+        <div className="bg-primary/10 rounded-xl p-3">
+          <p className="text-xs text-primary font-medium flex items-center gap-1"><Megaphone className="h-3.5 w-3.5" /> Este aviso sera enviado para todos os clientes cadastrados.</p>
+        </div>
+        <button disabled={sending} onClick={send} className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar Aviso
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -236,10 +283,21 @@ function AgendaTab({ shopId }: { shopId: string }) {
       if (appt) { setFinalizeModal(appt); return; }
     }
     const prev = items;
+    const appt = items?.find((a) => a.id === id);
     setItems((arr) => arr?.map((a) => a.id === id ? { ...a, status } : a) ?? null);
     const { error } = await supabase.from("appointments").update({ status }).eq("id", id);
     if (error) { toast.error("Erro ao atualizar status"); setItems(prev); }
-    else toast.success("Status atualizado");
+    else {
+      toast.success("Status atualizado");
+      if (appt?.clients?.id) {
+        const msgs: Record<string, { title: string; body: string }> = {
+          arrived: { title: "Voce chegou!", body: `Seu atendimento de ${appt.services?.name ?? "servico"} vai comecar em breve.` },
+          no_show: { title: "Falta registrada", body: `Voce nao compareceu ao agendamento de ${appt.services?.name ?? "servico"}.` },
+        };
+        const msg = msgs[status];
+        if (msg) createNotification({ clientId: appt.clients.id, barbershopId: shopId, ...msg, type: "status_change", data: { appointment_id: id } });
+      }
+    }
   };
 
   const finalize = async (id: string, file: File | null, chargePenalty: boolean, pendingPenaltyCents: number, clientId: string) => {
@@ -263,6 +321,10 @@ function AgendaTab({ shopId }: { shopId: string }) {
       }
       setItems((arr) => arr?.map((a) => a.id === id ? { ...a, status: "completed" as AppointmentStatus, photo_url, penalty_charged_cents: penaltyCharged } : a) ?? null);
       toast.success("Atendimento finalizado!");
+      if (clientId) {
+        const penaltyMsg = penaltyCharged > 0 ? ` Multa de ${formatBRL(penaltyCharged)} cobrada.` : "";
+        createNotification({ clientId, barbershopId: shopId, title: "Atendimento finalizado!", body: `Seu ${appt.services?.name ?? "servico"} foi concluido.${penaltyMsg}`, type: "status_change", data: { appointment_id: id } });
+      }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao finalizar");
     } finally {

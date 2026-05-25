@@ -1,4 +1,4 @@
-const CACHE_NAME = 'barberpro-v1';
+const CACHE_NAME = 'barberpro-v2';
 const urlsToCache = [
   '/',
   '/admin',
@@ -6,7 +6,6 @@ const urlsToCache = [
   '/master',
 ];
 
-// Instala service worker e faz cache dos arquivos essenciais
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -15,7 +14,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Ativa e limpa caches antigos
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -31,12 +29,10 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Estratégia: Network first, fallback para cache
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Se deu certo, salva no cache
         const responseToCache = response.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
@@ -44,8 +40,53 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // Se falhou (offline), tenta buscar do cache
         return caches.match(event.request);
       })
+  );
+});
+
+// --- Push Notifications ---
+
+self.addEventListener('push', (event) => {
+  let data = { title: 'BarberPro', body: 'Voce tem uma nova notificacao' };
+
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'barberpro-notification',
+    renotify: true,
+    data: data.data || {},
+    actions: data.actions || [],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || '/app';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes('/app') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      return clients.openWindow(targetUrl);
+    })
   );
 });

@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Calendar, Clock, ChevronRight, ArrowLeft, X, Scissors, Loader2, AlertTriangle } from "lucide-react";
+import { Calendar, Clock, ChevronRight, ArrowLeft, X, Scissors, Loader2, AlertTriangle, Bell } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { supabase } from "@/integrations/supabase/client";
 import { getBarbershopId, formatBRL } from "@/lib/barbershop";
 import { toast } from "sonner";
 import { InstallPWA } from "@/components/InstallPWA";
+import { NotificationBell } from "@/components/NotificationBell";
+import { subscribeToPush, isPushSupported, createNotification } from "@/lib/push";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -53,7 +55,7 @@ function ClientApp() {
   return (
     <>
       <MobileShell>
-        {screen === "login" && <Login onLogin={(id, name) => { saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home"); }} />}
+        {screen === "login" && <Login onLogin={(id, name) => { saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home"); if (isPushSupported()) subscribeToPush(id); }} />}
         {screen === "home" && <Home name={clientName} clientId={clientId!} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />}
         {screen === "booking" && <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />}
         {screen === "appointments" && <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />}
@@ -157,7 +159,10 @@ function Home({ name, clientId, onBook, onAppointments }: { name: string; client
     <div className="px-6 py-10">
       <div className="flex items-center justify-between">
         <div><p className="text-muted-foreground text-sm">Ola,</p><h1 className="text-2xl font-bold">{name}</h1></div>
-        <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
+        <div className="flex items-center gap-2">
+          <NotificationBell clientId={clientId} />
+          <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
+        </div>
       </div>
       <button onClick={onBook} className="mt-8 w-full p-6 rounded-3xl text-left text-primary-foreground relative overflow-hidden" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
         <Scissors className="absolute -right-4 -bottom-4 h-28 w-28 opacity-20" />
@@ -268,6 +273,9 @@ function Booking({ clientId, onBack, onDone }: { clientId: string; onBack: () =>
       const { error } = await supabase.from("appointments").insert({ barbershop_id: shopId, barber_id: barber.id, service_id: service.id, client_id: clientId, starts_at: starts.toISOString(), ends_at: ends.toISOString(), status: "scheduled" });
       if (error) throw error;
       toast.success("Agendamento confirmado!");
+      const dateLabel = new Date(starts).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+      const timeLabel = slot;
+      createNotification({ clientId, barbershopId: shopId, title: "Agendamento confirmado!", body: `${service.name} com ${barber.name} em ${dateLabel} as ${timeLabel}.`, type: "reminder", data: { date, slot } });
       onDone();
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Erro ao agendar"); }
     finally { setSaving(false); }
