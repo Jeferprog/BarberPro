@@ -69,7 +69,7 @@ function ClientApp() {
         {screen === "booking" && <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />}
         {screen === "appointments" && <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />}
       </MobileShell>
-      <InstallPWA />
+      {screen === "login" && <InstallPWA />}
     </>
   );
 }

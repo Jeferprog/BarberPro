@@ -149,7 +149,6 @@ function AdminApp() {
       {showAnnouncement && shopId && (
         <AnnouncementModal shopId={shopId} onClose={() => setShowAnnouncement(false)} />
       )}
-      <InstallPWA />
     </>
   );
 }
