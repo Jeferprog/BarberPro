@@ -9,6 +9,8 @@ import { InstallPWA } from "@/components/InstallPWA";
 import { NotificationBell } from "@/components/NotificationBell";
 import { subscribeToPush, isPushSupported, createNotification } from "@/lib/push";
 
+type LoginResult = { id: string; name: string; isNew: boolean };
+
 export const Route = createFileRoute("/app")({
   head: () => ({
     meta: [
@@ -55,7 +57,14 @@ function ClientApp() {
   return (
     <>
       <MobileShell>
-        {screen === "login" && <Login onLogin={(id, name) => { saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home"); if (isPushSupported()) subscribeToPush(id); }} />}
+        {screen === "login" && <Login onLogin={async ({ id, name, isNew }) => {
+          saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home");
+          if (isPushSupported()) subscribeToPush(id);
+          if (isNew) {
+            const shopId = await getBarbershopId();
+            createNotification({ clientId: id, barbershopId: shopId, title: `Bem-vindo ao BarberPro, ${name}!`, body: "Aqui voce agenda seu corte em segundos, acompanha seus horarios e recebe avisos da barbearia. Toque em 'Agendar Agora' para comecar!", type: "announcement" });
+          }
+        }} />}
         {screen === "home" && <Home name={clientName} clientId={clientId!} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />}
         {screen === "booking" && <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />}
         {screen === "appointments" && <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />}
@@ -66,7 +75,7 @@ function ClientApp() {
 }
 
 /* ---------------- LOGIN ---------------- */
-function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
+function Login({ onLogin }: { onLogin: (result: LoginResult) => void }) {
   const phoneRef = useRef<HTMLInputElement>(null);
   const [phoneDisplay, setPhoneDisplay] = useState("");
   const [name, setName] = useState("");
@@ -103,12 +112,12 @@ function Login({ onLogin }: { onLogin: (id: string, name: string) => void }) {
         const inf = name.trim().toLowerCase(); const cad = existing.name.toLowerCase();
         if (!cad.includes(inf) && !inf.includes(cad)) { toast.error("Nome nao confere com o cadastro."); setLoading(false); return; }
         toast.success(`Bem-vindo de volta, ${existing.name}!`);
-        onLogin(existing.id, existing.name); return;
+        onLogin({ id: existing.id, name: existing.name, isNew: false }); return;
       }
       const { data: created, error: insertError } = await supabase.from("clients").insert({ phone: cleaned, name: name.trim() }).select("id, name").single();
       if (insertError) throw insertError;
       toast.success(`Bem-vindo, ${created.name}!`);
-      onLogin(created.id, created.name);
+      onLogin({ id: created.id, name: created.name, isNew: true });
     } catch (e: any) { toast.error(e.message || "Erro ao tentar entrar"); }
     finally { setLoading(false); }
   };
