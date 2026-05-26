@@ -795,14 +795,19 @@ function CancellationSection({ shopId }: { shopId: string }) {
 }
 
 function ReminderSection({ shopId }: { shopId: string }) {
+  const DEFAULT_MSG = "Ola! Lembrete: voce tem {servico} com {barbeiro} agendado para {horario} ({data}). Te esperamos!";
   const [reminderHours, setReminderHours] = useState<number>(2);
+  const [reminderMessage, setReminderMessage] = useState<string>(DEFAULT_MSG);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("barbershop_settings").select("reminder_hours").eq("barbershop_id", shopId).maybeSingle();
-      if (data && data.reminder_hours !== undefined) setReminderHours(data.reminder_hours);
+      const { data } = await supabase.from("barbershop_settings").select("reminder_hours, reminder_message").eq("barbershop_id", shopId).maybeSingle();
+      if (data) {
+        if (data.reminder_hours !== undefined) setReminderHours(data.reminder_hours);
+        if (data.reminder_message) setReminderMessage(data.reminder_message);
+      }
       setLoading(false);
     })();
   }, [shopId]);
@@ -811,35 +816,89 @@ function ReminderSection({ shopId }: { shopId: string }) {
     if (reminderHours < 0) { toast.error("Valor invalido"); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.from("barbershop_settings").upsert({ barbershop_id: shopId, reminder_hours: reminderHours, updated_at: new Date().toISOString() }, { onConflict: "barbershop_id" });
+      const { error } = await supabase.from("barbershop_settings").upsert({
+        barbershop_id: shopId,
+        reminder_hours: reminderHours,
+        reminder_message: reminderMessage.trim() || DEFAULT_MSG,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "barbershop_id" });
       if (error) throw error;
       toast.success("Lembrete configurado!");
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Erro ao salvar"); }
     finally { setSaving(false); }
   };
 
+  const previewMessage = reminderMessage
+    .replace("{servico}", "Corte + Barba")
+    .replace("{barbeiro}", "Carlos")
+    .replace("{horario}", "14:30")
+    .replace("{data}", "seg 26/05")
+    .replace("{barbearia}", "Barbearia do Joao");
+
+  const insertPlaceholder = (ph: string) => {
+    setReminderMessage((prev) => prev + ph);
+  };
+
   if (loading) return <Loading />;
 
   return (
     <div className="space-y-4">
+      {/* Antecedência */}
       <div className="bg-card rounded-2xl p-5 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
         <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Lembrete automatico</p>
-          <p className="text-xs text-muted-foreground mb-3">O cliente recebe uma notificacao X horas antes do agendamento. Use 0 para desativar.</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Antecedencia do lembrete</p>
+          <p className="text-xs text-muted-foreground mb-3">Quantas horas antes do agendamento o cliente sera avisado. Use 0 para desativar.</p>
           <div className="flex items-center gap-3">
             <input type="number" value={reminderHours} onChange={(e) => setReminderHours(Number(e.target.value))} min={0} step={1} className="w-24 bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none text-center font-semibold" />
-            <span className="text-sm text-muted-foreground">horas antes do agendamento</span>
+            <span className="text-sm text-muted-foreground">horas antes</span>
           </div>
         </div>
+      </div>
+
+      {/* Mensagem personalizada */}
+      <div className="bg-card rounded-2xl p-5 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Mensagem do lembrete</p>
+          <p className="text-xs text-muted-foreground mb-3">Personalize a mensagem que o cliente recebe. Use os marcadores abaixo:</p>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {["{servico}", "{barbeiro}", "{horario}", "{data}", "{barbearia}"].map((ph) => (
+              <button key={ph} onClick={() => insertPlaceholder(ph)} className="px-2.5 py-1 rounded-lg bg-primary/15 text-primary text-xs font-mono font-medium hover:bg-primary/25 transition">
+                {ph}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={reminderMessage}
+            onChange={(e) => setReminderMessage(e.target.value)}
+            rows={3}
+            className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none resize-none"
+            placeholder={DEFAULT_MSG}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setReminderMessage(DEFAULT_MSG)} className="text-xs text-muted-foreground hover:text-primary transition underline">
+            Restaurar mensagem padrao
+          </button>
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="bg-card rounded-2xl p-5 space-y-3" style={{ boxShadow: "var(--shadow-card)" }}>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">Pre-visualizacao</p>
+        <div className="bg-background rounded-xl p-4 border border-border">
+          <p className="text-xs font-semibold text-foreground mb-1">Lembrete de agendamento</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">{previewMessage}</p>
+        </div>
         <div className="bg-primary/10 rounded-xl p-3">
-          <p className="text-xs text-primary font-medium">Configuracao atual:</p>
+          <p className="text-xs text-primary font-medium">Status:</p>
           <p className="text-xs text-muted-foreground mt-1">
             {reminderHours === 0
               ? "Lembretes desativados. Os clientes nao receberao aviso antes do agendamento."
-              : `Os clientes receberao uma notificacao ${reminderHours}h antes do horario marcado.`}
+              : `Lembrete sera enviado ${reminderHours}h antes do horario marcado.`}
           </p>
         </div>
       </div>
+
       <button disabled={saving} onClick={save} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar Lembrete</button>
     </div>
   );

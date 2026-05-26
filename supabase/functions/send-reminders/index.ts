@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const DEFAULT_MESSAGE = "Ola! Lembrete: voce tem {servico} com {barbeiro} agendado para {horario} ({data}). Te esperamos!";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -19,12 +21,24 @@ serve(async (req) => {
     // 1. Get all barbershops with their reminder settings
     const { data: shops } = await supabase
       .from("barbershop_settings")
-      .select("barbershop_id, reminder_hours");
+      .select("barbershop_id, reminder_hours, reminder_message");
 
     if (!shops || shops.length === 0) {
       return new Response(JSON.stringify({ sent: 0, message: "No shops configured" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Get barbershop names for {barbearia} placeholder
+    const shopIds = shops.map((s) => s.barbershop_id);
+    const { data: shopNames } = await supabase
+      .from("barbershops")
+      .select("id, name")
+      .in("id", shopIds);
+
+    const shopNameMap: Record<string, string> = {};
+    if (shopNames) {
+      for (const s of shopNames) shopNameMap[s.id] = s.name;
     }
 
     let totalSent = 0;
@@ -47,6 +61,9 @@ serve(async (req) => {
 
       if (!appointments || appointments.length === 0) continue;
 
+      const messageTemplate = shop.reminder_message || DEFAULT_MESSAGE;
+      const shopName = shopNameMap[shop.barbershop_id] || "Barbearia";
+
       // 3. Create notifications and mark as reminded
       for (const appt of appointments) {
         const startsAt = new Date(appt.starts_at);
@@ -55,12 +72,20 @@ serve(async (req) => {
         const serviceName = (appt.services as any)?.name ?? "servico";
         const barberName = (appt.barbers as any)?.name ?? "barbeiro";
 
+        // Build custom message from template
+        const customBody = messageTemplate
+          .replace(/\{servico\}/g, serviceName)
+          .replace(/\{barbeiro\}/g, barberName)
+          .replace(/\{horario\}/g, timeStr)
+          .replace(/\{data\}/g, dateStr)
+          .replace(/\{barbearia\}/g, shopName);
+
         // Insert in-app notification
         await supabase.from("notifications").insert({
           client_id: appt.client_id,
           barbershop_id: shop.barbershop_id,
           title: "Lembrete de agendamento",
-          body: `Voce tem ${serviceName} com ${barberName} hoje as ${timeStr} (${dateStr}). Ate la!`,
+          body: customBody,
           type: "reminder",
           data: { appointment_id: appt.id },
         });
@@ -77,7 +102,7 @@ serve(async (req) => {
               body: {
                 subscriptions: subs,
                 title: "Lembrete de agendamento",
-                body: `${serviceName} com ${barberName} hoje as ${timeStr}. Ate la!`,
+                body: customBody,
                 data: { type: "reminder", appointment_id: appt.id },
               },
             });
