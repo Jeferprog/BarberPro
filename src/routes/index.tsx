@@ -1,37 +1,56 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#d4af37" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="BarberPro" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
-    
-    <!-- Meta tags -->
-    <meta name="description" content="Sistema completo de agendamento e gestão para barbearias" />
-    <meta name="keywords" content="barbearia, agendamento, gestão, barbeiro" />
-    
-    <title>BarberPro</title>
-    
-    <!-- Registra service worker -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('SW registered:', reg))
-            .catch(err => console.log('SW registration failed:', err));
-        });
-      }
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./src/main.tsx"></script>
-  </body>
-</html>
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { MobileShell } from "@/components/MobileShell";
+import { Scissors } from "lucide-react";
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "BarberPro — Agendamento Premium" },
+      {
+        name: "description",
+        content: "Sistema completo de agendamento e gestao para barbearias.",
+      },
+    ],
+  }),
+  component: LandingPage,
+});
+
+function LandingPage() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate({ to: "/app" });
+    }, 2200);
+    return () => clearTimeout(timer);
+  }, [navigate]);
+
+  return (
+    <MobileShell>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6">
+        {/* Logo / Icon */}
+        <div className="animate-pulse">
+          <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-primary/10 ring-2 ring-primary/30">
+            <Scissors className="h-12 w-12 text-primary" />
+          </div>
+        </div>
+
+        {/* Brand */}
+        <h1 className="mt-8 text-4xl font-extrabold tracking-tight text-foreground">
+          Barber<span className="text-primary">Pro</span>
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Agendamento premium para barbearias
+        </p>
+
+        {/* Loading indicator */}
+        <div className="mt-12 flex items-center gap-2">
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary" />
+        </div>
+      </div>
+    </MobileShell>
+  );
+}

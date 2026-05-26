@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as MasterRouteImport } from './routes/master'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
+const MasterRoute = MasterRouteImport.update({
+  id: '/master',
+  path: '/master',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -33,34 +39,45 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/app': typeof AppRoute
+  '/master': typeof MasterRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/app': typeof AppRoute
+  '/master': typeof MasterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/app': typeof AppRoute
+  '/master': typeof MasterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/app'
+  fullPaths: '/' | '/admin' | '/app' | '/master'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/app'
-  id: '__root__' | '/' | '/admin' | '/app'
+  to: '/' | '/admin' | '/app' | '/master'
+  id: '__root__' | '/' | '/admin' | '/app' | '/master'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AppRoute: typeof AppRoute
+  MasterRoute: typeof MasterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/master': {
+      id: '/master'
+      path: '/master'
+      fullPath: '/master'
+      preLoaderRoute: typeof MasterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -89,16 +106,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AppRoute: AppRoute,
+  MasterRoute: MasterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: false
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
