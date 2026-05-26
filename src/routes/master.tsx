@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Lock, Unlock, Plus, Search, Building2, Calendar,
   DollarSign, Users, Loader2, X, Check, AlertTriangle,
   Eye, EyeOff, Copy, ChevronRight, ChevronLeft, Scissors,
-  Clock, Trash2, Pencil, Bell, UserPlus, Upload
+  Clock, Trash2, Pencil, Bell, UserPlus, Upload, Palette, Image
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,10 @@ type Barbershop = {
   blocked_at: string | null;
   created_at: string;
   due_date: string | null;
+  logo_url: string | null;
+  brand_color: string;
+  text_color: string;
+  font_family: string;
   settings?: {
     cancellation_hours: number;
     cancellation_fee_cents: number;
@@ -66,6 +70,7 @@ function MasterPanel() {
         .from('barbershops')
         .select(`
           id, name, active, blocked_reason, blocked_at, created_at, due_date,
+          logo_url, brand_color, text_color, font_family,
           barbershop_settings (cancellation_hours, cancellation_fee_cents, reminder_hours, reminder_message)
         `)
         .order('created_at', { ascending: false });
@@ -443,23 +448,57 @@ function ShopCard({ shop, onToggle, onDelete, onDetails }: {
 type WizardBarber = { name: string; days: Record<number, { active: boolean; start: string; end: string }> };
 type WizardService = { name: string; duration: number; price: string };
 
+const FONT_OPTIONS = [
+  { value: "Inter", label: "Inter (Padrao)" },
+  { value: "Playfair Display", label: "Playfair Display" },
+  { value: "Oswald", label: "Oswald" },
+  { value: "Montserrat", label: "Montserrat" },
+  { value: "Poppins", label: "Poppins" },
+  { value: "Bebas Neue", label: "Bebas Neue" },
+  { value: "Roboto", label: "Roboto" },
+  { value: "Raleway", label: "Raleway" },
+  { value: "Lora", label: "Lora" },
+  { value: "Dancing Script", label: "Dancing Script" },
+];
+
 function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [step, setStep] = useState(1);
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 6;
   const [saving, setSaving] = useState(false);
 
   // Step 1: Info basica
   const [name, setName] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  // Step 2: Cancelamento
+  // Step 2: Aparencia
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [brandColor, setBrandColor] = useState("#C9A84C");
+  const [textColor, setTextColor] = useState("#FFFFFF");
+  const [fontFamily, setFontFamily] = useState("Inter");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Step 3: Cancelamento
   const [cancelHours, setCancelHours] = useState(2);
   const [cancelFee, setCancelFee] = useState("20.00");
 
-  // Step 3: Lembretes
+  // Step 4: Lembretes
   const [reminderHours, setReminderHours] = useState(2);
   const DEFAULT_MSG = "Ola! Lembrete: voce tem {servico} com {barbeiro} agendado para {horario} ({data}). Te esperamos!";
   const [reminderMessage, setReminderMessage] = useState(DEFAULT_MSG);
+
+  // Load Google Font for preview
+  useEffect(() => {
+    if (fontFamily && fontFamily !== "Inter") {
+      const id = `gfont-${fontFamily.replace(/\s+/g, "-")}`;
+      if (!document.getElementById(id)) {
+        const link = document.createElement("link");
+        link.id = id; link.rel = "stylesheet";
+        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@400;700;800&display=swap`;
+        document.head.appendChild(link);
+      }
+    }
+  }, [fontFamily]);
 
   // Step 4: Barbeiros
   const defaultDays = (): Record<number, { active: boolean; start: string; end: string }> => {
@@ -472,12 +511,30 @@ function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: 
   // Step 5: Servicos
   const [services, setServices] = useState<WizardService[]>([{ name: "", duration: 30, price: "35.00" }]);
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Maximo 5MB"); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `temp/logo-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("barbershop-logos").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("barbershop-logos").getPublicUrl(path);
+      setLogoUrl(urlData.publicUrl);
+      toast.success("Logo enviado!");
+    } catch (err: any) { toast.error(err.message || "Erro ao enviar"); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
   const canNext = () => {
     if (step === 1) return name.trim().length > 0;
     if (step === 2) return true;
     if (step === 3) return true;
-    if (step === 4) return barbers.some(b => b.name.trim().length > 0);
-    if (step === 5) return services.some(s => s.name.trim().length > 0);
+    if (step === 4) return true;
+    if (step === 5) return barbers.some(b => b.name.trim().length > 0);
+    if (step === 6) return services.some(s => s.name.trim().length > 0);
     return true;
   };
 
@@ -506,10 +563,19 @@ function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: 
       const slug = name.trim().toLowerCase().normalize('NFD')
         .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-      // 1. Create barbershop
+      // 1. Create barbershop with branding
       const { data: shop, error: shopErr } = await supabase
         .from('barbershops')
-        .insert({ name: name.trim(), slug: slug || crypto.randomUUID().slice(0, 8), active: true, due_date: dueDate || null })
+        .insert({
+          name: name.trim(),
+          slug: slug || crypto.randomUUID().slice(0, 8),
+          active: true,
+          due_date: dueDate || null,
+          logo_url: logoUrl,
+          brand_color: brandColor,
+          text_color: textColor,
+          font_family: fontFamily,
+        })
         .select('id, name').single();
       if (shopErr) throw shopErr;
 
@@ -565,7 +631,7 @@ function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: 
     }
   };
 
-  const stepLabels = ["Dados", "Cancelamento", "Lembretes", "Barbeiros", "Servicos"];
+  const stepLabels = ["Dados", "Aparencia", "Cancelamento", "Lembretes", "Barbeiros", "Servicos"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -601,6 +667,69 @@ function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: 
 
           {step === 2 && (
             <>
+              <WizField label="Logotipo">
+                <div className="flex items-center gap-4">
+                  {logoUrl ? (
+                    <div className="relative">
+                      <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-2xl object-cover border-2 border-border" />
+                      <button onClick={() => setLogoUrl(null)} className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><X className="h-3 w-3" /></button>
+                    </div>
+                  ) : (
+                    <div className="h-16 w-16 rounded-2xl bg-background border-2 border-dashed border-border flex items-center justify-center">
+                      <Image className="h-6 w-6 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  <div>
+                    <input ref={fileRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                    <button onClick={() => fileRef.current?.click()} disabled={uploading} className="px-3 py-2 rounded-xl bg-background text-sm border border-border hover:border-primary transition flex items-center gap-2 disabled:opacity-50">
+                      {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      {logoUrl ? "Trocar" : "Enviar logo"}
+                    </button>
+                    <p className="text-[10px] text-muted-foreground mt-1">JPG, PNG, SVG. Max 5MB.</p>
+                  </div>
+                </div>
+              </WizField>
+              <WizField label="Cores da marca">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-xs text-muted-foreground">Cor principal</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="h-9 w-9 rounded-lg border border-border cursor-pointer" style={{ padding: 0 }} />
+                      <input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="flex-1 bg-background rounded-xl px-3 py-2 text-xs border border-border focus:border-primary outline-none font-mono uppercase" maxLength={7} />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-muted-foreground">Cor do texto</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="h-9 w-9 rounded-lg border border-border cursor-pointer" style={{ padding: 0 }} />
+                      <input value={textColor} onChange={(e) => setTextColor(e.target.value)} className="flex-1 bg-background rounded-xl px-3 py-2 text-xs border border-border focus:border-primary outline-none font-mono uppercase" maxLength={7} />
+                    </div>
+                  </div>
+                </div>
+              </WizField>
+              <WizField label="Fonte do nome">
+                <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto">
+                  {FONT_OPTIONS.map(f => (
+                    <button key={f.value} onClick={() => setFontFamily(f.value)} className={`px-2 py-2 rounded-xl text-xs transition border ${fontFamily === f.value ? "border-primary bg-primary/10 text-primary font-semibold" : "border-border bg-background text-muted-foreground"}`} style={{ fontFamily: `"${f.value}", sans-serif` }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </WizField>
+              {/* Mini preview */}
+              <div className="bg-background rounded-xl p-4 flex flex-col items-center border border-border">
+                {logoUrl ? <img src={logoUrl} alt="" className="h-12 w-12 rounded-xl object-cover mb-2" /> : (
+                  <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-2" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` }}>
+                    <Scissors className="h-6 w-6" style={{ color: textColor }} />
+                  </div>
+                )}
+                <p className="text-lg font-bold" style={{ fontFamily: `"${fontFamily}", sans-serif`, color: brandColor }}>{name || "Nome da Barbearia"}</p>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
               <WizField label="Prazo minimo para cancelamento (horas)">
                 <input type="number" value={cancelHours} onChange={(e) => setCancelHours(Number(e.target.value))} min={0} className="w-full bg-background rounded-xl px-4 py-3 border border-border focus:border-primary outline-none" />
               </WizField>
@@ -616,7 +745,7 @@ function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <>
               <WizField label="Antecedencia do lembrete (horas)">
                 <div className="flex items-center gap-3">
@@ -642,7 +771,7 @@ function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <>
               <p className="text-xs text-muted-foreground">Adicione os barbeiros e defina os horarios de trabalho de cada um.</p>
               {barbers.map((b, idx) => (
@@ -687,7 +816,7 @@ function CreateWizard({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <>
               <p className="text-xs text-muted-foreground">Cadastre os servicos oferecidos pela barbearia.</p>
               {services.map((s, idx) => (
@@ -753,7 +882,7 @@ function WizField({ label, children }: { label: string; children: React.ReactNod
 /* ─── Details Modal (enhanced) ─── */
 function DetailsModal({ shopId, onClose }: { shopId: string; onClose: () => void }) {
   const [shop, setShop] = useState<Barbershop | null>(null);
-  const [detailTab, setDetailTab] = useState<"info" | "barbers" | "services" | "settings">("info");
+  const [detailTab, setDetailTab] = useState<"info" | "branding" | "barbers" | "services" | "settings">("info");
   const [barbers, setBarbers] = useState<BarberItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -795,20 +924,22 @@ function DetailsModal({ shopId, onClose }: { shopId: string; onClose: () => void
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-5 bg-background rounded-xl p-1">
+        <div className="flex gap-1 mb-5 bg-background rounded-xl p-1 overflow-x-auto">
           {([
-            { key: "info", label: "Informacoes", icon: Building2 },
+            { key: "info", label: "Info", icon: Building2 },
+            { key: "branding", label: "Aparencia", icon: Palette },
             { key: "barbers", label: "Barbeiros", icon: Users },
             { key: "services", label: "Servicos", icon: Scissors },
             { key: "settings", label: "Config", icon: Bell },
           ] as const).map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setDetailTab(key)} className={`flex-1 py-2 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 ${detailTab === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            <button key={key} onClick={() => setDetailTab(key)} className={`flex-1 py-2 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1 flex-shrink-0 ${detailTab === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
               <Icon className="h-3.5 w-3.5" />{label}
             </button>
           ))}
         </div>
 
         {detailTab === "info" && <InfoTab shop={shop} />}
+        {detailTab === "branding" && <BrandingTab shop={shop} onRefresh={loadAll} />}
         {detailTab === "barbers" && <BarbersTab shopId={shopId} barbers={barbers} onRefresh={loadAll} />}
         {detailTab === "services" && <ServicesTab shopId={shopId} services={services} onRefresh={loadAll} />}
         {detailTab === "settings" && <SettingsTab shop={shop} onRefresh={loadAll} />}
@@ -818,6 +949,145 @@ function DetailsModal({ shopId, onClose }: { shopId: string; onClose: () => void
 }
 
 /* ── Info Tab ── */
+/* ── Branding Tab ── */
+function BrandingTab({ shop, onRefresh }: { shop: Barbershop; onRefresh: () => void }) {
+  const [shopName, setShopName] = useState(shop.name);
+  const [logoUrl, setLogoUrl] = useState(shop.logo_url);
+  const [brandColor, setBrandColor] = useState(shop.brand_color || "#C9A84C");
+  const [textColor, setTextColor] = useState(shop.text_color || "#FFFFFF");
+  const [fontFamily, setFontFamily] = useState(shop.font_family || "Inter");
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (fontFamily && fontFamily !== "Inter") {
+      const id = `gfont-${fontFamily.replace(/\s+/g, "-")}`;
+      if (!document.getElementById(id)) {
+        const link = document.createElement("link");
+        link.id = id; link.rel = "stylesheet";
+        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@400;700;800&display=swap`;
+        document.head.appendChild(link);
+      }
+    }
+  }, [fontFamily]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Maximo 5MB"); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${shop.id}/logo-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("barbershop-logos").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("barbershop-logos").getPublicUrl(path);
+      setLogoUrl(urlData.publicUrl);
+      toast.success("Logo enviado!");
+    } catch (err: any) { toast.error(err.message || "Erro ao enviar"); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
+  const save = async () => {
+    if (!shopName.trim()) { toast.error("Nome obrigatorio"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("barbershops").update({
+        name: shopName.trim(), logo_url: logoUrl, brand_color: brandColor, text_color: textColor, font_family: fontFamily,
+      }).eq("id", shop.id);
+      if (error) throw error;
+      toast.success("Aparencia salva!");
+      onRefresh();
+    } catch (err: any) { toast.error(err.message || "Erro ao salvar"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Logo */}
+      <div className="bg-background rounded-2xl p-4 space-y-3 border border-border">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5"><Image className="h-3.5 w-3.5" /> Logotipo</p>
+        <div className="flex items-center gap-4">
+          {logoUrl ? (
+            <div className="relative">
+              <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-2xl object-cover border-2 border-border" />
+              <button onClick={() => setLogoUrl(null)} className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"><X className="h-3 w-3" /></button>
+            </div>
+          ) : (
+            <div className="h-16 w-16 rounded-2xl bg-card border-2 border-dashed border-border flex items-center justify-center">
+              <Scissors className="h-6 w-6 text-muted-foreground/30" />
+            </div>
+          )}
+          <div>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            <button onClick={() => fileRef.current?.click()} disabled={uploading} className="px-3 py-2 rounded-xl bg-card text-sm border border-border hover:border-primary transition flex items-center gap-2 disabled:opacity-50">
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              {logoUrl ? "Trocar" : "Enviar"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Nome */}
+      <div className="bg-background rounded-2xl p-4 space-y-3 border border-border">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold"><Pencil className="h-3.5 w-3.5 inline mr-1" /> Nome</p>
+        <input value={shopName} onChange={(e) => setShopName(e.target.value)} className="w-full bg-card rounded-xl px-3 py-2 text-sm border border-border focus:border-primary outline-none" />
+      </div>
+
+      {/* Cores */}
+      <div className="bg-background rounded-2xl p-4 space-y-3 border border-border">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold"><Palette className="h-3.5 w-3.5 inline mr-1" /> Cores</p>
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Principal</label>
+            <div className="flex items-center gap-1.5 mt-1">
+              <input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="h-8 w-8 rounded-lg border border-border cursor-pointer" style={{ padding: 0 }} />
+              <input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="flex-1 bg-card rounded-lg px-2 py-1.5 text-[10px] border border-border outline-none font-mono uppercase" maxLength={7} />
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Texto</label>
+            <div className="flex items-center gap-1.5 mt-1">
+              <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="h-8 w-8 rounded-lg border border-border cursor-pointer" style={{ padding: 0 }} />
+              <input value={textColor} onChange={(e) => setTextColor(e.target.value)} className="flex-1 bg-card rounded-lg px-2 py-1.5 text-[10px] border border-border outline-none font-mono uppercase" maxLength={7} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fonte */}
+      <div className="bg-background rounded-2xl p-4 space-y-3 border border-border">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Fonte</p>
+        <div className="grid grid-cols-2 gap-1.5 max-h-[120px] overflow-y-auto">
+          {FONT_OPTIONS.map(f => (
+            <button key={f.value} onClick={() => setFontFamily(f.value)} className={`px-2 py-1.5 rounded-lg text-xs transition border ${fontFamily === f.value ? "border-primary bg-primary/10 text-primary font-semibold" : "border-border bg-card text-muted-foreground"}`} style={{ fontFamily: `"${f.value}", sans-serif` }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="bg-background rounded-xl p-4 flex flex-col items-center border border-border">
+        {logoUrl ? <img src={logoUrl} alt="" className="h-14 w-14 rounded-xl object-cover mb-2" /> : (
+          <div className="h-14 w-14 rounded-xl flex items-center justify-center mb-2" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` }}>
+            <Scissors className="h-7 w-7" style={{ color: textColor }} />
+          </div>
+        )}
+        <p className="text-xl font-bold" style={{ fontFamily: `"${fontFamily}", sans-serif`, color: brandColor }}>{shopName || "Nome"}</p>
+        <div className="mt-3 px-6 py-1.5 rounded-lg text-xs font-bold" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)`, color: textColor }}>
+          Entrar Agora
+        </div>
+      </div>
+
+      <button onClick={save} disabled={saving} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar Aparencia
+      </button>
+    </div>
+  );
+}
+
 function InfoTab({ shop }: { shop: Barbershop }) {
   return (
     <div className="space-y-3">

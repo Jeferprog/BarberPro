@@ -30,6 +30,13 @@ type Appointment = {
   services: { name: string; price_cents: number } | null;
   barbers: { name: string } | null;
 };
+type ShopBranding = {
+  name: string;
+  logo_url: string | null;
+  brand_color: string;
+  text_color: string;
+  font_family: string;
+};
 
 const CLIENT_SESSION_MS = 2 * 60 * 60 * 1000;
 
@@ -54,18 +61,43 @@ function ClientApp() {
   const [screen, setScreen] = useState<Screen>(() => getClientSession() ? "home" : "login");
   const [clientId, setClientId] = useState<string | null>(() => getClientSession()?.id ?? null);
   const [clientName, setClientName] = useState(() => getClientSession()?.name ?? "");
+  const [branding, setBranding] = useState<ShopBranding | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const shopId = await getBarbershopId();
+        const { data } = await supabase.from("barbershops").select("name, logo_url, brand_color, text_color, font_family").eq("id", shopId).single();
+        if (data) {
+          setBranding(data as ShopBranding);
+          // Load Google Font dynamically
+          if (data.font_family && data.font_family !== "Inter") {
+            const id = `gfont-${data.font_family.replace(/\s+/g, "-")}`;
+            if (!document.getElementById(id)) {
+              const link = document.createElement("link");
+              link.id = id; link.rel = "stylesheet";
+              link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(data.font_family)}:wght@400;700;800&display=swap`;
+              document.head.appendChild(link);
+            }
+          }
+        }
+      } catch { /* fallback to defaults */ }
+    })();
+  }, []);
+
   return (
     <>
       <MobileShell>
-        {screen === "login" && <Login onLogin={async ({ id, name, isNew }) => {
+        {screen === "login" && <Login branding={branding} onLogin={async ({ id, name, isNew }) => {
           saveClientSession(id, name); setClientId(id); setClientName(name); setScreen("home");
           if (isPushSupported()) subscribeToPush(id);
           if (isNew) {
             const shopId = await getBarbershopId();
-            createNotification({ clientId: id, barbershopId: shopId, title: `Bem-vindo ao BarberPro, ${name}!`, body: "Aqui voce agenda seu corte em segundos, acompanha seus horarios e recebe avisos da barbearia. Toque em 'Agendar Agora' para comecar!", type: "announcement" });
+            const shopName = branding?.name || "BarberPro";
+            createNotification({ clientId: id, barbershopId: shopId, title: `Bem-vindo a ${shopName}, ${name}!`, body: "Aqui voce agenda seu corte em segundos, acompanha seus horarios e recebe avisos da barbearia. Toque em 'Agendar Agora' para comecar!", type: "announcement" });
           }
         }} />}
-        {screen === "home" && <Home name={clientName} clientId={clientId!} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />}
+        {screen === "home" && <Home name={clientName} clientId={clientId!} branding={branding} onBook={() => setScreen("booking")} onAppointments={() => setScreen("appointments")} />}
         {screen === "booking" && <Booking clientId={clientId!} onBack={() => setScreen("home")} onDone={() => setScreen("appointments")} />}
         {screen === "appointments" && <MyAppointments clientId={clientId!} onBack={() => setScreen("home")} />}
       </MobileShell>
@@ -75,7 +107,7 @@ function ClientApp() {
 }
 
 /* ---------------- LOGIN ---------------- */
-function Login({ onLogin }: { onLogin: (result: LoginResult) => void }) {
+function Login({ onLogin, branding }: { onLogin: (result: LoginResult) => void; branding: ShopBranding | null }) {
   const phoneRef = useRef<HTMLInputElement>(null);
   const [phoneDisplay, setPhoneDisplay] = useState("");
   const [name, setName] = useState("");
@@ -128,11 +160,20 @@ function Login({ onLogin }: { onLogin: (result: LoginResult) => void }) {
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
       <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full py-8">
-        <div className="h-20 w-20 rounded-3xl flex items-center justify-center mb-8 mx-auto" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)", transform: "rotate(-5deg)" }}>
-          <Scissors className="h-10 w-10 text-primary-foreground" />
-        </div>
+        {/* Logo / Branding */}
+        {branding?.logo_url ? (
+          <div className="mb-8 mx-auto">
+            <img src={branding.logo_url} alt={branding.name} className="h-24 w-24 rounded-3xl object-cover" style={{ boxShadow: "var(--shadow-gold)" }} />
+          </div>
+        ) : (
+          <div className="h-20 w-20 rounded-3xl flex items-center justify-center mb-8 mx-auto" style={{ background: branding?.brand_color ? `linear-gradient(135deg, ${branding.brand_color}, ${branding.brand_color}cc)` : "var(--gradient-gold)", boxShadow: "var(--shadow-gold)", transform: "rotate(-5deg)" }}>
+            <Scissors className="h-10 w-10" style={{ color: branding?.text_color || "var(--primary-foreground)" }} />
+          </div>
+        )}
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold tracking-tight">BarberPro</h1>
+          <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: branding?.font_family ? `"${branding.font_family}", sans-serif` : undefined, color: branding?.brand_color || undefined }}>
+            {branding?.name || "BarberPro"}
+          </h1>
           <p className="text-muted-foreground mt-3 text-lg">{needName ? "So mais um passo..." : "Agende seu estilo em segundos"}</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -146,7 +187,7 @@ function Login({ onLogin }: { onLogin: (result: LoginResult) => void }) {
               <input id="name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" disabled={loading} autoFocus style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }} className="w-full bg-card text-foreground h-16 px-6 rounded-2xl border-2 border-border focus:border-primary outline-none text-lg font-medium placeholder:text-muted-foreground/30" />
             </div>
           )}
-          <button type="submit" disabled={loading || (phoneDisplay.replace(/\D/g, "").length < 10)} className="w-full py-5 rounded-2xl font-bold text-lg text-primary-foreground flex items-center justify-center gap-3 disabled:opacity-40 active:scale-[0.97] transition-all mt-4" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
+          <button type="submit" disabled={loading || (phoneDisplay.replace(/\D/g, "").length < 10)} className="w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 disabled:opacity-40 active:scale-[0.97] transition-all mt-4" style={{ background: branding?.brand_color ? `linear-gradient(135deg, ${branding.brand_color}, ${branding.brand_color}cc)` : "var(--gradient-gold)", boxShadow: branding?.brand_color ? `0 8px 28px -8px ${branding.brand_color}73` : "var(--shadow-gold)", color: branding?.text_color || "var(--primary-foreground)" }}>
             {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <>{needName ? "Concluir Cadastro" : "Entrar Agora"}<ChevronRight className="h-5 w-5" /></>}
           </button>
         </form>
@@ -156,7 +197,7 @@ function Login({ onLogin }: { onLogin: (result: LoginResult) => void }) {
 }
 
 /* ---------------- HOME ---------------- */
-function Home({ name, clientId, onBook, onAppointments }: { name: string; clientId: string; onBook: () => void; onAppointments: () => void }) {
+function Home({ name, clientId, branding, onBook, onAppointments }: { name: string; clientId: string; branding: ShopBranding | null; onBook: () => void; onAppointments: () => void }) {
   const [upcoming, setUpcoming] = useState<Appointment[]>([]);
   useEffect(() => {
     (async () => {
@@ -167,13 +208,16 @@ function Home({ name, clientId, onBook, onAppointments }: { name: string; client
   return (
     <div className="px-6 py-10">
       <div className="flex items-center justify-between">
-        <div><p className="text-muted-foreground text-sm">Ola,</p><h1 className="text-2xl font-bold">{name}</h1></div>
+        <div className="flex items-center gap-3">
+          {branding?.logo_url && <img src={branding.logo_url} alt="" className="h-10 w-10 rounded-xl object-cover" />}
+          <div><p className="text-muted-foreground text-sm">Ola,</p><h1 className="text-2xl font-bold">{name}</h1></div>
+        </div>
         <div className="flex items-center gap-2">
           <NotificationBell clientId={clientId} />
           <Link to="/" className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-muted-foreground">X</Link>
         </div>
       </div>
-      <button onClick={onBook} className="mt-8 w-full p-6 rounded-3xl text-left text-primary-foreground relative overflow-hidden" style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}>
+      <button onClick={onBook} className="mt-8 w-full p-6 rounded-3xl text-left relative overflow-hidden" style={{ background: branding?.brand_color ? `linear-gradient(135deg, ${branding.brand_color}, ${branding.brand_color}cc)` : "var(--gradient-gold)", boxShadow: branding?.brand_color ? `0 8px 28px -8px ${branding.brand_color}73` : "var(--shadow-gold)", color: branding?.text_color || "var(--primary-foreground)" }}>
         <Scissors className="absolute -right-4 -bottom-4 h-28 w-28 opacity-20" />
         <div className="text-sm opacity-80">Pronto para um novo visual?</div>
         <div className="text-2xl font-bold mt-1">Agendar Agora</div>

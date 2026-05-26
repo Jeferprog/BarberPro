@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar, Users, Scissors, BarChart3, Clock,
   Check, UserCheck, UserX, TrendingUp, DollarSign, Plus,
   Loader2, Trash2, X, Pencil, Settings, AlertTriangle, Lock,
-  Megaphone, Send,
+  Megaphone, Send, Palette, Upload, Image,
 } from "lucide-react";
 import { toast } from "sonner";
 import { MobileShell } from "@/components/MobileShell";
@@ -656,17 +656,200 @@ const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 type WorkingHour = { id: string; barber_id: string; day_of_week: number; start_time: string; end_time: string };
 
 function ConfigTab({ shopId }: { shopId: string }) {
-  const [section, setSection] = useState<"horarios" | "cancelamento" | "lembretes">("horarios");
+  const [section, setSection] = useState<"aparencia" | "horarios" | "cancelamento" | "lembretes">("aparencia");
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <button onClick={() => setSection("horarios")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "horarios" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>Horarios</button>
-        <button onClick={() => setSection("cancelamento")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "cancelamento" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>Cancelamento</button>
-        <button onClick={() => setSection("lembretes")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === "lembretes" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>Lembretes</button>
+      <div className="flex gap-1.5 overflow-x-auto">
+        {(["aparencia", "horarios", "cancelamento", "lembretes"] as const).map(s => (
+          <button key={s} onClick={() => setSection(s)} className={`flex-shrink-0 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${section === s ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}>
+            {s === "aparencia" ? "Aparencia" : s === "horarios" ? "Horarios" : s === "cancelamento" ? "Cancelamento" : "Lembretes"}
+          </button>
+        ))}
       </div>
+      {section === "aparencia" && <BrandingSection shopId={shopId} />}
       {section === "horarios" && <HoursSection shopId={shopId} />}
       {section === "cancelamento" && <CancellationSection shopId={shopId} />}
       {section === "lembretes" && <ReminderSection shopId={shopId} />}
+    </div>
+  );
+}
+
+const FONT_OPTIONS = [
+  { value: "Inter", label: "Inter (Padrao)" },
+  { value: "Playfair Display", label: "Playfair Display" },
+  { value: "Oswald", label: "Oswald" },
+  { value: "Montserrat", label: "Montserrat" },
+  { value: "Poppins", label: "Poppins" },
+  { value: "Bebas Neue", label: "Bebas Neue" },
+  { value: "Roboto", label: "Roboto" },
+  { value: "Raleway", label: "Raleway" },
+  { value: "Lora", label: "Lora" },
+  { value: "Dancing Script", label: "Dancing Script" },
+];
+
+function BrandingSection({ shopId }: { shopId: string }) {
+  const [shopName, setShopName] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [brandColor, setBrandColor] = useState("#C9A84C");
+  const [textColor, setTextColor] = useState("#FFFFFF");
+  const [fontFamily, setFontFamily] = useState("Inter");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("barbershops").select("name, logo_url, brand_color, text_color, font_family").eq("id", shopId).single();
+      if (data) {
+        setShopName(data.name || "");
+        setLogoUrl(data.logo_url || null);
+        setBrandColor(data.brand_color || "#C9A84C");
+        setTextColor(data.text_color || "#FFFFFF");
+        setFontFamily(data.font_family || "Inter");
+      }
+      setLoading(false);
+    })();
+  }, [shopId]);
+
+  // Load Google Font dynamically for preview
+  useEffect(() => {
+    if (fontFamily && fontFamily !== "Inter") {
+      const id = `gfont-${fontFamily.replace(/\s+/g, "-")}`;
+      if (!document.getElementById(id)) {
+        const link = document.createElement("link");
+        link.id = id;
+        link.rel = "stylesheet";
+        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@400;700;800&display=swap`;
+        document.head.appendChild(link);
+      }
+    }
+  }, [fontFamily]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Arquivo muito grande. Maximo 5MB."); return; }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${shopId}/logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("barbershop-logos").upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("barbershop-logos").getPublicUrl(path);
+      setLogoUrl(urlData.publicUrl);
+      toast.success("Logo enviado!");
+    } catch (err: any) { toast.error(err.message || "Erro ao enviar logo"); }
+    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
+  };
+
+  const removeLogo = () => setLogoUrl(null);
+
+  const save = async () => {
+    if (!shopName.trim()) { toast.error("Nome da barbearia e obrigatorio"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("barbershops").update({
+        name: shopName.trim(),
+        logo_url: logoUrl,
+        brand_color: brandColor,
+        text_color: textColor,
+        font_family: fontFamily,
+      }).eq("id", shopId);
+      if (error) throw error;
+      toast.success("Aparencia salva!");
+    } catch (err: any) { toast.error(err.message || "Erro ao salvar"); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <Loading />;
+
+  return (
+    <div className="space-y-4">
+      {/* Logo */}
+      <div className="bg-card rounded-2xl p-5 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5"><Image className="h-3.5 w-3.5" /> Logotipo</p>
+        <div className="flex items-center gap-4">
+          {logoUrl ? (
+            <div className="relative">
+              <img src={logoUrl} alt="Logo" className="h-20 w-20 rounded-2xl object-cover border-2 border-border" />
+              <button onClick={removeLogo} className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs"><X className="h-3 w-3" /></button>
+            </div>
+          ) : (
+            <div className="h-20 w-20 rounded-2xl bg-background border-2 border-dashed border-border flex items-center justify-center">
+              <Scissors className="h-8 w-8 text-muted-foreground/30" />
+            </div>
+          )}
+          <div className="flex-1">
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="px-4 py-2.5 rounded-xl bg-background text-sm font-medium border border-border hover:border-primary transition flex items-center gap-2 disabled:opacity-50">
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {uploading ? "Enviando..." : logoUrl ? "Trocar logo" : "Enviar logo"}
+            </button>
+            <p className="text-[10px] text-muted-foreground mt-1.5">JPG, PNG, SVG ou WebP. Max 5MB.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Nome e Fonte */}
+      <div className="bg-card rounded-2xl p-5 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5"><Pencil className="h-3.5 w-3.5" /> Nome da barbearia</p>
+        <input value={shopName} onChange={(e) => setShopName(e.target.value)} className="w-full bg-background rounded-xl px-4 py-3 text-sm border border-border focus:border-primary outline-none" placeholder="Nome da barbearia" />
+
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mt-2">Fonte do nome</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {FONT_OPTIONS.map(f => (
+            <button key={f.value} onClick={() => setFontFamily(f.value)} className={`px-3 py-2.5 rounded-xl text-sm transition border ${fontFamily === f.value ? "border-primary bg-primary/10 text-primary font-semibold" : "border-border bg-background text-muted-foreground hover:border-primary/50"}`} style={{ fontFamily: `"${f.value}", sans-serif` }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Cores */}
+      <div className="bg-card rounded-2xl p-5 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5"><Palette className="h-3.5 w-3.5" /> Cores da marca</p>
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground mb-1 block">Cor principal</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="h-10 w-10 rounded-lg border border-border cursor-pointer" style={{ padding: 0 }} />
+              <input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="flex-1 bg-background rounded-xl px-3 py-2 text-sm border border-border focus:border-primary outline-none font-mono uppercase" maxLength={7} />
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground mb-1 block">Cor do texto</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="h-10 w-10 rounded-lg border border-border cursor-pointer" style={{ padding: 0 }} />
+              <input value={textColor} onChange={(e) => setTextColor(e.target.value)} className="flex-1 bg-background rounded-xl px-3 py-2 text-sm border border-border focus:border-primary outline-none font-mono uppercase" maxLength={7} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="bg-card rounded-2xl p-5" style={{ boxShadow: "var(--shadow-card)" }}>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-3">Pre-visualizacao</p>
+        <div className="bg-background rounded-2xl p-6 flex flex-col items-center">
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-2xl object-cover mb-3" />
+          ) : (
+            <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-3" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` }}>
+              <Scissors className="h-8 w-8" style={{ color: textColor }} />
+            </div>
+          )}
+          <h3 className="text-2xl font-bold" style={{ fontFamily: `"${fontFamily}", sans-serif`, color: brandColor }}>
+            {shopName || "Nome da Barbearia"}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">Agende seu estilo em segundos</p>
+          <div className="mt-4 w-full max-w-[200px] py-2.5 rounded-xl text-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)`, color: textColor }}>
+            Entrar Agora
+          </div>
+        </div>
+      </div>
+
+      <button disabled={saving} onClick={save} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar Aparencia</button>
     </div>
   );
 }
