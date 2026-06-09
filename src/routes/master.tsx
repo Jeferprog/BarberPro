@@ -159,9 +159,12 @@ function MasterPanel() {
     }
 
     try {
-      // Busca IDs dos barbeiros e clientes vinculados para limpar tabelas dependentes
+      // Busca IDs dos barbeiros e serviços para limpar tabelas dependentes
       const { data: barberRows } = await supabase.from('barbers').select('id').eq('barbershop_id', shop.id);
       const barberIds = barberRows?.map(b => b.id) || [];
+
+      const { data: serviceRows } = await supabase.from('services').select('id').eq('barbershop_id', shop.id);
+      const serviceIds = serviceRows?.map(s => s.id) || [];
 
       // 1. Notificações da barbearia
       await supabase.from('notifications').delete().eq('barbershop_id', shop.id);
@@ -176,24 +179,37 @@ function MasterPanel() {
       // 3. Penalidades de clientes
       await supabase.from('client_penalties').delete().eq('barbershop_id', shop.id);
 
-      // 4. Agendamentos
+      // 4. Agendamentos (antes de barbeiros e serviços)
       await supabase.from('appointments').delete().eq('barbershop_id', shop.id);
 
-      // 5. Horários de trabalho dos barbeiros
+      // 5. Vínculo barbeiro-serviço
+      if (barberIds.length > 0) {
+        await supabase.from('barber_services').delete().in('barber_id', barberIds);
+      }
+      if (serviceIds.length > 0) {
+        await supabase.from('barber_services').delete().in('service_id', serviceIds);
+      }
+
+      // 6. Slots bloqueados dos barbeiros
+      if (barberIds.length > 0) {
+        await supabase.from('blocked_slots').delete().in('barber_id', barberIds);
+      }
+
+      // 7. Horários de trabalho dos barbeiros
       if (barberIds.length > 0) {
         await supabase.from('working_hours').delete().in('barber_id', barberIds);
       }
 
-      // 6. Barbeiros
+      // 8. Barbeiros
       await supabase.from('barbers').delete().eq('barbershop_id', shop.id);
 
-      // 7. Serviços
+      // 9. Serviços
       await supabase.from('services').delete().eq('barbershop_id', shop.id);
 
-      // 8. Configurações
+      // 10. Configurações
       await supabase.from('barbershop_settings').delete().eq('barbershop_id', shop.id);
 
-      // 9. Finalmente, a barbearia
+      // 11. Finalmente, a barbearia
       const { error } = await supabase.from('barbershops').delete().eq('id', shop.id);
       if (error) throw error;
 
