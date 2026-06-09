@@ -159,7 +159,44 @@ function MasterPanel() {
     }
 
     try {
-      await supabase.from('barbershops').delete().eq('id', shop.id);
+      // Busca IDs dos barbeiros e clientes vinculados para limpar tabelas dependentes
+      const { data: barberRows } = await supabase.from('barbers').select('id').eq('barbershop_id', shop.id);
+      const barberIds = barberRows?.map(b => b.id) || [];
+
+      // 1. Notificações da barbearia
+      await supabase.from('notifications').delete().eq('barbershop_id', shop.id);
+
+      // 2. Push subscriptions dos clientes vinculados
+      const { data: clientRows } = await supabase.from('appointments').select('client_id').eq('barbershop_id', shop.id);
+      const clientIds = [...new Set(clientRows?.map(c => c.client_id).filter(Boolean) || [])];
+      if (clientIds.length > 0) {
+        await supabase.from('push_subscriptions').delete().in('client_id', clientIds);
+      }
+
+      // 3. Penalidades de clientes
+      await supabase.from('client_penalties').delete().eq('barbershop_id', shop.id);
+
+      // 4. Agendamentos
+      await supabase.from('appointments').delete().eq('barbershop_id', shop.id);
+
+      // 5. Horários de trabalho dos barbeiros
+      if (barberIds.length > 0) {
+        await supabase.from('working_hours').delete().in('barber_id', barberIds);
+      }
+
+      // 6. Barbeiros
+      await supabase.from('barbers').delete().eq('barbershop_id', shop.id);
+
+      // 7. Serviços
+      await supabase.from('services').delete().eq('barbershop_id', shop.id);
+
+      // 8. Configurações
+      await supabase.from('barbershop_settings').delete().eq('barbershop_id', shop.id);
+
+      // 9. Finalmente, a barbearia
+      const { error } = await supabase.from('barbershops').delete().eq('id', shop.id);
+      if (error) throw error;
+
       toast.success("Barbearia deletada");
       loadShops();
     } catch (e: any) {
