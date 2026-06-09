@@ -1,6 +1,6 @@
 {
-  "name": "BarberPro - Gestão de Barbearia",
-  "short_name": "BarberPro",
+  "name": "CadeiraCheia - Gestão de Barbearia",
+  "short_name": "CadeiraCheia",
   "description": "Sistema completo de agendamento e gestão para barbearias",
   "start_url": "/",
   "display": "standalone",

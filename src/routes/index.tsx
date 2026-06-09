@@ -6,7 +6,7 @@ import { Scissors } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BarberPro — Agendamento Premium" },
+      { title: "CadeiraCheia — Agendamento Premium" },
       {
         name: "description",
         content: "Sistema completo de agendamento e gestao para barbearias.",
@@ -38,7 +38,7 @@ function LandingPage() {
 
         {/* Brand */}
         <h1 className="mt-8 text-4xl font-extrabold tracking-tight text-foreground">
-          Barber<span className="text-primary">Pro</span>
+          Cadeira<span className="text-primary">Cheia</span>
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Agendamento premium para barbearias

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'barberpro-v2';
+const CACHE_NAME = 'cadeiracheia-v2';
 const urlsToCache = [
   '/',
   '/admin',
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
 // --- Push Notifications ---
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'BarberPro', body: 'Voce tem uma nova notificacao' };
+  let data = { title: 'CadeiraCheia', body: 'Voce tem uma nova notificacao' };
 
   if (event.data) {
     try {
@@ -63,7 +63,7 @@ self.addEventListener('push', (event) => {
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     vibrate: [200, 100, 200],
-    tag: data.tag || 'barberpro-notification',
+    tag: data.tag || 'cadeiracheia-notification',
     renotify: true,
     data: data.data || {},
     actions: data.actions || [],

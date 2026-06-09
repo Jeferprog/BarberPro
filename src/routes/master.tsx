@@ -13,7 +13,7 @@ import { formatBRL } from "@/lib/barbershop";
 export const Route = createFileRoute("/master")({
   head: () => ({
     meta: [
-      { title: "BarberPro — Painel Master" },
+      { title: "CadeiraCheia — Painel Master" },
       { name: "description", content: "Gestão completa de todas as barbearias" },
     ],
   }),

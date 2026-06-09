@@ -14,8 +14,8 @@ export default defineConfig({
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
-          name: 'BarberPro',
-          short_name: 'BarberPro',
+          name: 'CadeiraCheia',
+          short_name: 'CadeiraCheia',
           description: 'Agendamento e gerenciamento para barbearia',
           theme_color: '#ffffff',
           background_color: '#ffffff',

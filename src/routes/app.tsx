@@ -14,7 +14,7 @@ type LoginResult = { id: string; name: string; isNew: boolean };
 export const Route = createFileRoute("/app")({
   head: () => ({
     meta: [
-      { title: "BarberPro — Cliente" },
+      { title: "CadeiraCheia — Cliente" },
       { name: "description", content: "Agende seu horario na barbearia." },
     ],
   }),
@@ -93,7 +93,7 @@ function ClientApp() {
           if (isPushSupported()) subscribeToPush(id);
           if (isNew) {
             const shopId = await getBarbershopId();
-            const shopName = branding?.name || "BarberPro";
+            const shopName = branding?.name || "CadeiraCheia";
             createNotification({ clientId: id, barbershopId: shopId, title: `Bem-vindo a ${shopName}, ${name}!`, body: "Aqui voce agenda seu corte em segundos, acompanha seus horarios e recebe avisos da barbearia. Toque em 'Agendar Agora' para comecar!", type: "announcement" });
           }
         }} />}
@@ -172,7 +172,7 @@ function Login({ onLogin, branding }: { onLogin: (result: LoginResult) => void; 
         )}
         <div className="text-center mb-10">
           <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: branding?.font_family ? `"${branding.font_family}", sans-serif` : undefined, color: branding?.brand_color || undefined }}>
-            {branding?.name || "BarberPro"}
+            {branding?.name || "CadeiraCheia"}
           </h1>
           <p className="text-muted-foreground mt-3 text-lg">{needName ? "So mais um passo..." : "Agende seu estilo em segundos"}</p>
         </div>

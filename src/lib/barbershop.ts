@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 let cachedShopId: string | null = null;
-const SHOP_ID_KEY = "barberpro_shop_id";
+const SHOP_ID_KEY = "cadeiracheia_shop_id";
 
 /**
  * Obtém o ID da barbearia de 3 fontes (em ordem de prioridade):

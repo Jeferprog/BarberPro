@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY") || "";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") || "";
-const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:suporte@barberpro.com.br";
+const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:suporte@cadeiracheia.com.br";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -196,7 +196,7 @@ serve(async (req) => {
     }
 
     const privateKey = await importVapidKeys();
-    const payload = { title, body, data, tag: `barberpro-${Date.now()}` };
+    const payload = { title, body, data, tag: `cadeiracheia-${Date.now()}` };
 
     const results = await Promise.allSettled(
       subscriptions.map((sub: { endpoint: string; p256dh: string; auth: string }) =>

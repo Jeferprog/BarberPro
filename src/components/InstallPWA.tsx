@@ -65,7 +65,7 @@ export function InstallPWA() {
         </div>
 
         <div className="flex-1">
-          <h3 className="font-semibold text-sm">Instalar BarberPro</h3>
+          <h3 className="font-semibold text-sm">Instalar CadeiraCheia</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Adicione à tela inicial para acesso rápido
           </p>

@@ -16,7 +16,7 @@ import { createNotification, createBulkNotification } from "@/lib/push";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "BarberPro — Painel da Barbearia" },
+      { title: "CadeiraCheia — Painel da Barbearia" },
       { name: "description", content: "Gestao completa da sua barbearia." },
     ],
   }),
@@ -219,7 +219,7 @@ function BlockedScreen({ reason, blockedAt }: { reason: string; blockedAt: strin
               <p className="text-sm font-semibold mb-1">Para reativar sua conta:</p>
               <p className="text-xs text-muted-foreground">Entre em contato pelo WhatsApp</p>
               <a 
-                href="https://wa.me/5551999999999?text=Olá, preciso reativar minha conta BarberPro" 
+                href="https://wa.me/5551999999999?text=Olá, preciso reativar minha conta CadeiraCheia" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="mt-3 w-full py-2.5 rounded-xl bg-success text-success-foreground font-medium text-sm flex items-center justify-center gap-2 hover:bg-success/90 transition"
@@ -230,7 +230,7 @@ function BlockedScreen({ reason, blockedAt }: { reason: string; blockedAt: strin
 
             <div className="bg-card-elevated rounded-xl p-4">
               <p className="text-sm font-semibold mb-1">Outras formas de contato:</p>
-              <p className="text-xs text-muted-foreground mt-2">📧 Email: suporte@barberpro.com.br</p>
+              <p className="text-xs text-muted-foreground mt-2">📧 Email: suporte@cadeiracheia.com.br</p>
               <p className="text-xs text-muted-foreground mt-1">📞 Tel: (51) 99999-9999</p>
             </div>
           </div>
